@@ -640,10 +640,8 @@ function loadPlaylistsLocal() {
 function savePlaylistsLocal() { localStorage.setItem(LS.playlists, JSON.stringify(State.playlists)); }
 
 //============== GAS ==============
-function gas(action, body) {
+function _jsonpCall(url, action, body) {
   return new Promise((resolve, reject) => {
-    const url = State.settings.gasUrl;
-    if (!url) { reject(new Error('GAS URL 未設定')); return; }
     const cb = 'song_cb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
     const params = new URLSearchParams();
     params.set('action', action); params.set('callback', cb);
@@ -654,10 +652,40 @@ function gas(action, body) {
     const s = document.createElement('script');
     s.src = url + sep + params.toString();
     window[cb] = (data) => { try { resolve(data); } finally { delete window[cb]; s.remove(); } };
-    s.onerror = () => { delete window[cb]; s.remove(); reject(new Error('GAS load error')); };
+    s.onerror = () => { delete window[cb]; s.remove(); reject(new Error('JSONP load error')); };
     setTimeout(()=>{ if (window[cb]) { delete window[cb]; s.remove(); reject(new Error('GAS timeout')); } }, 14000);
     document.body.appendChild(s);
   });
+}
+
+async function gas(action, body={}) {
+  const url = State.settings.gasUrl;
+  if (!url) throw new Error('GAS URL 未設定');
+  const payload = JSON.stringify({ action, ...body });
+  // 1) 先試 POST cors (text/plain 不會觸發 preflight)
+  try {
+    const res = await fetch(url, {
+      method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: payload, redirect:'follow'
+    });
+    if (res.ok) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch(_) { return { ok:true, raw:text }; }
+    }
+  } catch(_){ /* CORS 或網路問題,繼續備援 */ }
+  // 2) Payload 不大 → JSONP (跨網域 GET 一定能讀回應)
+  if (payload.length < 1500) {
+    try { return await _jsonpCall(url, action, body); } catch(_){}
+  }
+  // 3) Payload 大且 CORS 被擋 → POST no-cors 火了不問 (寫入仍會成功)
+  try {
+    await fetch(url, {
+      method:'POST', mode:'no-cors',
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: payload
+    });
+    return { ok:true, opaque:true };
+  } catch(e) { throw e; }
 }
 function gasFromCloudSong(s) {
   const tryParse = v => { if (!v) return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch(_){ return null; } };
@@ -676,7 +704,7 @@ function gasFromCloudSong(s) {
 }
 async function syncFromGAS() {
   if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
-  let pulled = 0, pushed = 0, plPulled = 0, plPushed = 0;
+  let pulled = 0, pushed = 0, plPulled = 0, plPushed = 0, deduped = 0;
   const errors = [];
   try {
     const r = await gas('getSongs');
@@ -712,9 +740,47 @@ async function syncFromGAS() {
       const cloud = p.playlists.map(x => ({ id: x['ID'], name: x['名稱'], sortOrder: Number(x['排序'])||0, color: x['顏色'] || '' }));
       const cloudIds = new Set(cloud.map(p => p.id));
       const localOnly = State.playlists.filter(p => !cloudIds.has(p.id));
-      State.playlists = [...cloud, ...localOnly];
+      const merged = [...cloud, ...localOnly];
+
+      // 依名稱去重:相同名稱保留第一個,其餘 id 重映射並從雲端刪除
+      const byName = new Map();
+      const idMap = new Map();
+      const kept = [];
+      for (const pl of merged) {
+        const key = String(pl.name || '').trim().toLowerCase();
+        if (!key) { kept.push(pl); continue; }
+        const exist = byName.get(key);
+        if (exist) {
+          idMap.set(pl.id, exist.id);
+        } else {
+          byName.set(key, pl);
+          kept.push(pl);
+        }
+      }
+
+      State.playlists = kept;
+
+      if (idMap.size) {
+        // 重映射所有歌的 playlistIds
+        for (const s of State.songs) {
+          if (Array.isArray(s.playlistIds) && s.playlistIds.length) {
+            const newIds = [...new Set(s.playlistIds.map(id => idMap.get(id) || id))];
+            if (newIds.join(',') !== s.playlistIds.join(',')) {
+              s.playlistIds = newIds;
+              pushSongToCloud(s).catch(()=>{});
+            }
+          }
+        }
+        // 從雲端刪掉重複的
+        for (const dupId of idMap.keys()) {
+          gas('deletePlaylist', { ID: dupId }).then(()=>deduped++).catch(()=>{});
+        }
+        deduped = idMap.size;
+      }
+
       savePlaylistsLocal(); renderPlaylistTabs();
       for (const lp of localOnly) {
+        if (idMap.has(lp.id)) continue;
         try {
           const pr = await gas('upsertPlaylist', { 'ID': lp.id, '名稱': lp.name, '排序': lp.sortOrder, '顏色': lp.color || '' });
           if (pr && pr.ok) plPushed++;
@@ -723,8 +789,10 @@ async function syncFromGAS() {
     }
   } catch(e) { errors.push(e.message); }
 
-  const msg = `雲端 ✓ 拉:${pulled}首/${plPulled}類 推:${pushed}首/${plPushed}類` + (errors.length ? ' ⚠️ ' + errors[0].slice(0,40) : '');
-  toast(msg, errors.length ? 5000 : 2500);
+  const msg = `雲端 ✓ 拉:${pulled}首/${plPulled}類 推:${pushed}首/${plPushed}類`
+    + (deduped ? ` 去重:${deduped}類` : '')
+    + (errors.length ? ' ⚠️ ' + errors[0].slice(0,40) : '');
+  toast(msg, errors.length ? 5000 : 3000);
   if (errors.length) console.warn('sync errors:', errors);
 }
 
@@ -1553,6 +1621,8 @@ function openPlMgr() {
 }
 async function createPlaylist() {
   const name = $('#pl-new-name').value.trim(); if (!name) return;
+  const exist = State.playlists.find(p => String(p.name||'').trim().toLowerCase() === name.toLowerCase());
+  if (exist) { toast('已有同名歌單,直接使用'); $('#pl-new-name').value=''; renderPlaylistTabs(); return; }
   const p = { id: uid('pl'), name, sortOrder: State.playlists.length, color: '' };
   State.playlists.push(p); savePlaylistsLocal();
   $('#pl-new-name').value = '';
