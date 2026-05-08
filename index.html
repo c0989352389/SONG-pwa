@@ -704,7 +704,7 @@ function gasFromCloudSong(s) {
 }
 async function syncFromGAS() {
   if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
-  let pulled = 0, pushed = 0, plPulled = 0, plPushed = 0, deduped = 0;
+  let pulled = 0, pushed = 0, plPulled = 0, plPushed = 0, deduped = 0, songsDeduped = 0;
   const errors = [];
   try {
     const r = await gas('getSongs');
@@ -721,14 +721,54 @@ async function syncFromGAS() {
       const cloudIds = new Set(cloud.map(s => s.id));
       const cloudVids = new Set(cloud.map(s => s.videoId).filter(Boolean));
       const localOnly = State.songs.filter(s => !cloudIds.has(s.id) && !cloudVids.has(s.videoId));
-      State.songs = [...cloud, ...localOnly];
+      let merged = [...cloud, ...localOnly];
+
+      // 依 videoId 去重歌曲(同 video 多列只保留一筆,合併歌詞/翻譯/歌單歸屬)
+      const byVid = new Map();
+      const dupSongIds = [];
+      const keptSongs = [];
+      for (const s of merged) {
+        const key = (s.videoId || '').trim();
+        if (!key) { keptSongs.push(s); continue; }
+        const exist = byVid.get(key);
+        if (exist) {
+          if (!exist.lrc && s.lrc) exist.lrc = s.lrc;
+          if ((!exist.lrcOffset || exist.lrcOffset === 0) && s.lrcOffset) exist.lrcOffset = s.lrcOffset;
+          if (!exist.translations || !Object.keys(exist.translations).length) exist.translations = s.translations || {};
+          if (!exist.explanations || !Object.keys(exist.explanations).length) exist.explanations = s.explanations || {};
+          if (Array.isArray(s.playlistIds) && s.playlistIds.length) {
+            exist.playlistIds = [...new Set([...(exist.playlistIds||[]), ...s.playlistIds])];
+          }
+          if ((Number(s.playCount)||0) > (Number(exist.playCount)||0)) exist.playCount = s.playCount;
+          dupSongIds.push(s.id);
+        } else {
+          byVid.set(key, s);
+          keptSongs.push(s);
+        }
+      }
+      State.songs = keptSongs;
       saveSongsLocal(); renderLibrary();
-      for (const s of localOnly) {
+
+      // 從雲端刪除重複列
+      for (const dupId of dupSongIds) {
+        gas('deleteSong', { ID: dupId }).catch(()=>{});
+      }
+      songsDeduped = dupSongIds.length;
+
+      // 推送本地獨有(且去重後仍存在)
+      const pushList = localOnly.filter(s => !dupSongIds.includes(s.id) && State.songs.some(x => x.id === s.id));
+      for (const s of pushList) {
         try {
           const pr = await pushSongToCloud(s);
           if (pr && pr.ok) pushed++;
           else if (pr && !pr.ok) errors.push('push: ' + pr.error);
         } catch(e) { errors.push('push: ' + e.message); }
+      }
+      // 把合併後豐富的欄位回推雲端(只有發生過合併才需要)
+      if (dupSongIds.length) {
+        for (const s of State.songs) {
+          if (byVid.get(s.videoId) === s) pushSongToCloud(s).catch(()=>{});
+        }
       }
     }
 
@@ -790,7 +830,8 @@ async function syncFromGAS() {
   } catch(e) { errors.push(e.message); }
 
   const msg = `雲端 ✓ 拉:${pulled}首/${plPulled}類 推:${pushed}首/${plPushed}類`
-    + (deduped ? ` 去重:${deduped}類` : '')
+    + (songsDeduped ? ` 去重:${songsDeduped}首` : '')
+    + (deduped ? ` ${songsDeduped?'+':''}${deduped}類` : '')
     + (errors.length ? ' ⚠️ ' + errors[0].slice(0,40) : '');
   toast(msg, errors.length ? 5000 : 3000);
   if (errors.length) console.warn('sync errors:', errors);
