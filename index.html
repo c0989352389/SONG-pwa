@@ -441,7 +441,12 @@ body.mode-lyrics #np-vis{display:none}
 
     <section class="page" id="page-library">
       <div class="lib-search">
-        <input type="text" id="lib-q" placeholder="🔍 搜尋我的歌單（歌名 / 歌手 / 標籤）">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="lib-q" placeholder="🔍 搜尋我的歌單" style="flex:1">
+          <button class="gb" id="btn-cloud-sync" title="從雲端同步">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+        </div>
         <div class="pl-tabs" id="pl-tabs"></div>
       </div>
       <div id="lib-list"></div>
@@ -1795,6 +1800,16 @@ function bind() {
     if (State.settings.gasUrl) syncFromGAS();
   });
   $('#btn-resync').addEventListener('click', syncFromGAS);
+  $('#btn-cloud-sync').addEventListener('click', () => {
+    if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
+    syncFromGAS();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && State.settings.gasUrl) syncFromGAS();
+  });
+  window.addEventListener('focus', () => {
+    if (State.settings.gasUrl) syncFromGAS();
+  });
 
   $('#btn-edit-lrc').addEventListener('click', () => {
     if (!State.currentId) { toast('請先選一首歌'); return; }
