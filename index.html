@@ -1554,7 +1554,22 @@ async function init() {
     art.innerHTML = s.thumb ? `<img src="${s.thumb}">` : '<span>♪</span>';
     parseLyrics(s.lrc || '');
   }
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+      reg.update();
+      setInterval(() => reg.update(), 60 * 60 * 1000); // 每小時檢查一次
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            toast('有新版本,2 秒後重新載入…', 1500);
+            setTimeout(() => location.reload(), 1800);
+          }
+        });
+      });
+    }).catch(()=>{});
+  }
 }
 init();
 </script>
