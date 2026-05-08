@@ -639,6 +639,7 @@ function gasFromCloudSong(s) {
     sections: tryParse(s['段落JSON']) || [],
     playlistIds: tryParse(s['歌單IDs']) || (s['歌單IDs'] ? String(s['歌單IDs']).split(',').filter(Boolean) : []),
     bpm: Number(s['BPM'])||0,
+    lrcOffset: Number(s['歌詞偏移'])||0,
   };
 }
 async function syncFromGAS() {
@@ -647,13 +648,21 @@ async function syncFromGAS() {
     // 雙向合併:雲端為主,本地獨有的補回雲端
     const r = await gas('getSongs');
     if (r && r.ok && Array.isArray(r.songs)) {
-      const cloud = r.songs.map(gasFromCloudSong);
+      // 把本機獨有欄位(偏移、_lrcTried)記下來,合併後復原
+      const localById = new Map(State.songs.map(s => [s.id, s]));
+      const cloud = r.songs.map(gasFromCloudSong).map(c => {
+        const local = localById.get(c.id);
+        if (local) {
+          // 雲端沒帶偏移時,保留本機的
+          if ((!c.lrcOffset || c.lrcOffset === 0) && local.lrcOffset) c.lrcOffset = local.lrcOffset;
+        }
+        return c;
+      });
       const cloudIds = new Set(cloud.map(s => s.id));
       const cloudVids = new Set(cloud.map(s => s.videoId).filter(Boolean));
       const localOnly = State.songs.filter(s => !cloudIds.has(s.id) && !cloudVids.has(s.videoId));
       State.songs = [...cloud, ...localOnly];
       saveSongsLocal(); renderLibrary();
-      // 補推本地獨有
       for (const s of localOnly) pushSongToCloud(s);
     }
     const p = await gas('getPlaylists');
@@ -678,7 +687,7 @@ function pushSongToCloud(s) {
     '標籤': s.tag, '備註': s.note, '歌詞LRC': s.lrc,
     '翻譯JSON': JSON.stringify(s.translations||{}), '解釋JSON': JSON.stringify(s.explanations||{}),
     '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
-    'BPM': s.bpm || 0
+    'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0
   }).catch(e => console.warn('push', e));
 }
 
