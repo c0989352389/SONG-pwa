@@ -512,6 +512,7 @@ body.mode-lyrics #np-vis{display:none}
         <label>Gemini API Key（AI 歌詞 / 翻譯 / 解釋）</label>
         <input type="text" id="set-gemini-key" placeholder="AIzaSy...">
         <div style="font-size:11px;color:var(--text3);margin-top:4px">免費於 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent2)">Google AI Studio</a> 申請</div>
+        <div id="gemini-cooldown-info" style="font-size:11px;margin-top:6px;display:none"></div>
       </div>
       <div class="modal-row">
         <label>GAS Web App URL（雲端同步歌單，選填）</label>
@@ -892,9 +893,26 @@ function pushSongToCloud(s) {
 }
 
 //============== Gemini ==============
+const GEMINI_COOLDOWN_KEY = 'gemini_cooldown_until';
+function _geminiCooldownLeft() {
+  const until = +localStorage.getItem(GEMINI_COOLDOWN_KEY) || 0;
+  return Math.max(0, until - Date.now());
+}
+function _setGeminiCooldown(ms) {
+  localStorage.setItem(GEMINI_COOLDOWN_KEY, String(Date.now() + ms));
+}
+function _clearGeminiCooldown() {
+  localStorage.removeItem(GEMINI_COOLDOWN_KEY);
+}
+function _fmtCooldown(ms) {
+  const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000);
+  return h > 0 ? `${h}小時${m}分` : `${m}分`;
+}
 async function gemini(prompt, opts={}) {
   const key = State.settings.geminiKey;
   if (!key) throw new Error('未設 Gemini API Key');
+  const left = _geminiCooldownLeft();
+  if (left > 0) throw new Error(`AI 額度用完冷卻中（剩 ${_fmtCooldown(left)}）`);
   const model = opts.model || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const body = {
@@ -908,6 +926,10 @@ async function gemini(prompt, opts={}) {
   });
   if (!r.ok) {
     const t = await r.text();
+    if (r.status === 429) {
+      _setGeminiCooldown(24*3600*1000);
+      toast('AI 額度用完,自動降級 24 小時');
+    }
     throw new Error('Gemini ' + r.status + ': ' + t.slice(0,200));
   }
   const j = await r.json();
@@ -2132,6 +2154,19 @@ function bind() {
     $('#set-gemini-key').value = State.settings.geminiKey || '';
     $('#set-gas-url').value = State.settings.gasUrl || '';
     $('#set-lang').value = State.settings.lang || 'zh-TW';
+    const info = $('#gemini-cooldown-info');
+    const left = _geminiCooldownLeft();
+    if (left > 0) {
+      info.style.display = 'block';
+      info.style.color = '#ff8a8a';
+      info.innerHTML = `⚠ AI 額度用完冷卻中（剩 ${_fmtCooldown(left)}）<a href="#" id="gemini-reset" style="color:var(--accent2);margin-left:8px">重置</a>`;
+      setTimeout(() => {
+        const r = document.getElementById('gemini-reset');
+        if (r) r.onclick = (e) => { e.preventDefault(); _clearGeminiCooldown(); info.style.display = 'none'; toast('已重置 AI 冷卻'); };
+      }, 0);
+    } else {
+      info.style.display = 'none';
+    }
     $('#modal-settings').classList.add('show');
   });
   $('#btn-save-settings').addEventListener('click', () => {
