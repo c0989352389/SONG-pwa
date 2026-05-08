@@ -1783,18 +1783,64 @@ async function createPlaylist() {
 }
 
 //============== Add song ==============
-async function searchYouTube(q) {
+async function searchYouTube(q, pageToken) {
   if (!State.settings.ytKey) { toast('請先到 ⚙ 設定 YouTube API Key'); return []; }
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(q)}&key=${State.settings.ytKey}`;
+  let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(q)}&key=${State.settings.ytKey}`;
+  if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
   const r = await fetch(url);
   if (!r.ok) { toast('搜尋失敗 ' + r.status); return []; }
   const j = await r.json();
-  return (j.items || [])
+  const items = (j.items || [])
     .filter(it => it && it.id && it.id.videoId)
     .map(it => ({
       videoId: it.id.videoId, title: it.snippet.title, artist: it.snippet.channelTitle,
       thumb: (it.snippet.thumbnails.medium || it.snippet.thumbnails.default).url
     }));
+  items.nextPageToken = j.nextPageToken || '';
+  return items;
+}
+const YT_SEARCH_STATE = { q:'', token:'', appending:false };
+function _renderYTRow(it, existingVids) {
+  const dup = existingVids.has(it.videoId);
+  return `<div class="result-row">
+    <img src="${it.thumb}" alt="">
+    <div class="song-info">
+      <div class="song-title">${escapeHtml(it.title)}</div>
+      <div class="song-meta">${escapeHtml(it.artist)}${dup ? ' <span class="song-tag">已收藏</span>' : ''}</div>
+    </div>
+    <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}" ${dup?'disabled':''}>${dup?'✓':'＋'}</button>
+  </div>`;
+}
+function _bindYTRowButtons(list) {
+  list.querySelectorAll('button[data-vid]:not([data-bound])').forEach(b => {
+    b.setAttribute('data-bound','1');
+    b.addEventListener('click', async () => {
+      b.disabled = true; b.textContent = '…';
+      await addSong({ videoId: b.dataset.vid, title: b.dataset.title, artist: b.dataset.artist, thumb: b.dataset.thumb });
+      b.textContent = '✓';
+    });
+  });
+}
+async function ytSearchMore() {
+  if (!YT_SEARCH_STATE.token || YT_SEARCH_STATE.appending) return;
+  YT_SEARCH_STATE.appending = true;
+  const list = $('#yt-results');
+  const moreBtn = list.querySelector('#yt-more');
+  if (moreBtn) { moreBtn.disabled = true; moreBtn.textContent = '載入中…'; }
+  let items = [];
+  try { items = await searchYouTube(YT_SEARCH_STATE.q, YT_SEARCH_STATE.token); }
+  catch(e){ if (moreBtn) { moreBtn.disabled = false; moreBtn.textContent = '載入更多'; } toast('載入失敗:' + e.message); YT_SEARCH_STATE.appending = false; return; }
+  YT_SEARCH_STATE.token = items.nextPageToken || '';
+  const existingVids = new Set(State.songs.map(s => s.videoId));
+  const html = items.map(it => _renderYTRow(it, existingVids)).join('');
+  if (moreBtn) moreBtn.remove();
+  list.insertAdjacentHTML('beforeend', html);
+  if (YT_SEARCH_STATE.token) {
+    list.insertAdjacentHTML('beforeend', '<button class="btn dim" id="yt-more" style="width:100%;margin-top:10px">載入更多</button>');
+    list.querySelector('#yt-more').addEventListener('click', ytSearchMore);
+  }
+  _bindYTRowButtons(list);
+  YT_SEARCH_STATE.appending = false;
 }
 async function addSong(s) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
@@ -2126,25 +2172,17 @@ function bind() {
     const list = $('#yt-results');
     list.innerHTML = '<div class="empty"><div class="empty-t"><span class="spinner"></span> 搜尋中…</div></div>';
     let items = [];
-    try { items = await searchYouTube(q); } catch(e){ list.innerHTML = '<div class="empty"><div class="empty-t">搜尋失敗：' + escapeHtml(e.message) + '</div></div>'; return; }
+    try { items = await searchYouTube(q); } catch(e){ list.innerHTML = '<div class="empty"><div class="empty-t">搜尋失敗:' + escapeHtml(e.message) + '</div></div>'; return; }
     if (!items.length) { list.innerHTML = '<div class="empty"><div class="empty-t">沒結果</div></div>'; return; }
+    YT_SEARCH_STATE.q = q;
+    YT_SEARCH_STATE.token = items.nextPageToken || '';
     const existingVids = new Set(State.songs.map(s => s.videoId));
-    list.innerHTML = items.map(it => {
-      const dup = existingVids.has(it.videoId);
-      return `<div class="result-row">
-        <img src="${it.thumb}" alt="">
-        <div class="song-info">
-          <div class="song-title">${escapeHtml(it.title)}</div>
-          <div class="song-meta">${escapeHtml(it.artist)}${dup ? ' <span class="song-tag">已收藏</span>' : ''}</div>
-        </div>
-        <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}" ${dup?'disabled':''}>${dup?'✓':'＋'}</button>
-      </div>`;
-    }).join('');
-    list.querySelectorAll('button[data-vid]').forEach(b => b.addEventListener('click', async () => {
-      b.disabled = true; b.textContent = '…';
-      await addSong({ videoId: b.dataset.vid, title: b.dataset.title, artist: b.dataset.artist, thumb: b.dataset.thumb });
-      b.textContent = '✓';
-    }));
+    list.innerHTML = items.map(it => _renderYTRow(it, existingVids)).join('');
+    if (YT_SEARCH_STATE.token) {
+      list.insertAdjacentHTML('beforeend', '<button class="btn dim" id="yt-more" style="width:100%;margin-top:10px">載入更多</button>');
+      list.querySelector('#yt-more').addEventListener('click', ytSearchMore);
+    }
+    _bindYTRowButtons(list);
   });
   $('#yt-q').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-yt-search').click(); });
   $('#btn-add-url').addEventListener('click', addByUrl);
