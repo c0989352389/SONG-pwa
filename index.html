@@ -517,7 +517,8 @@ body.mode-lyrics #np-vis{display:none}
         </select>
       </div>
       <div class="modal-foot">
-        <button class="btn dim" id="btn-resync">手動同步雲端</button>
+        <button class="btn dim" id="btn-test-gas">🔌 測試 GAS</button>
+        <button class="btn dim" id="btn-resync">⟳ 手動同步</button>
         <button class="btn dim" data-close>取消</button>
         <button class="btn pri" id="btn-save-settings">儲存</button>
       </div>
@@ -674,19 +675,19 @@ function gasFromCloudSong(s) {
   };
 }
 async function syncFromGAS() {
-  if (!State.settings.gasUrl) return;
+  if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
+  let pulled = 0, pushed = 0, plPulled = 0, plPushed = 0;
+  const errors = [];
   try {
-    // 雙向合併:雲端為主,本地獨有的補回雲端
     const r = await gas('getSongs');
-    if (r && r.ok && Array.isArray(r.songs)) {
-      // 把本機獨有欄位(偏移、_lrcTried)記下來,合併後復原
+    if (!r) errors.push('getSongs 無回應');
+    else if (!r.ok) errors.push('getSongs: ' + (r.error || 'unknown'));
+    else if (Array.isArray(r.songs)) {
+      pulled = r.songs.length;
       const localById = new Map(State.songs.map(s => [s.id, s]));
       const cloud = r.songs.map(gasFromCloudSong).map(c => {
         const local = localById.get(c.id);
-        if (local) {
-          // 雲端沒帶偏移時,保留本機的
-          if ((!c.lrcOffset || c.lrcOffset === 0) && local.lrcOffset) c.lrcOffset = local.lrcOffset;
-        }
+        if (local && (!c.lrcOffset || c.lrcOffset === 0) && local.lrcOffset) c.lrcOffset = local.lrcOffset;
         return c;
       });
       const cloudIds = new Set(cloud.map(s => s.id));
@@ -694,22 +695,47 @@ async function syncFromGAS() {
       const localOnly = State.songs.filter(s => !cloudIds.has(s.id) && !cloudVids.has(s.videoId));
       State.songs = [...cloud, ...localOnly];
       saveSongsLocal(); renderLibrary();
-      for (const s of localOnly) pushSongToCloud(s);
+      for (const s of localOnly) {
+        try {
+          const pr = await pushSongToCloud(s);
+          if (pr && pr.ok) pushed++;
+          else if (pr && !pr.ok) errors.push('push: ' + pr.error);
+        } catch(e) { errors.push('push: ' + e.message); }
+      }
     }
+
     const p = await gas('getPlaylists');
-    if (p && p.ok && Array.isArray(p.playlists)) {
+    if (!p) errors.push('getPlaylists 無回應');
+    else if (!p.ok) errors.push('getPlaylists: ' + (p.error || 'unknown'));
+    else if (Array.isArray(p.playlists)) {
+      plPulled = p.playlists.length;
       const cloud = p.playlists.map(x => ({ id: x['ID'], name: x['名稱'], sortOrder: Number(x['排序'])||0, color: x['顏色'] || '' }));
       const cloudIds = new Set(cloud.map(p => p.id));
       const localOnly = State.playlists.filter(p => !cloudIds.has(p.id));
       State.playlists = [...cloud, ...localOnly];
       savePlaylistsLocal(); renderPlaylistTabs();
-      // 補推本地獨有
       for (const lp of localOnly) {
-        gas('upsertPlaylist', { 'ID': lp.id, '名稱': lp.name, '排序': lp.sortOrder, '顏色': lp.color || '' }).catch(()=>{});
+        try {
+          const pr = await gas('upsertPlaylist', { 'ID': lp.id, '名稱': lp.name, '排序': lp.sortOrder, '顏色': lp.color || '' });
+          if (pr && pr.ok) plPushed++;
+        } catch(_){}
       }
     }
-    toast('雲端已同步');
-  } catch(e){ toast('雲端同步失敗：' + e.message); }
+  } catch(e) { errors.push(e.message); }
+
+  const msg = `雲端 ✓ 拉:${pulled}首/${plPulled}類 推:${pushed}首/${plPushed}類` + (errors.length ? ' ⚠️ ' + errors[0].slice(0,40) : '');
+  toast(msg, errors.length ? 5000 : 2500);
+  if (errors.length) console.warn('sync errors:', errors);
+}
+
+async function testGasConnection() {
+  if (!State.settings.gasUrl) { toast('GAS URL 未填'); return; }
+  toast('測試連線中…');
+  try {
+    const r = await gas('ping');
+    if (r && r.ok) toast('✓ GAS 連線正常 ' + (r.time || ''), 3000);
+    else toast('GAS 回傳異常: ' + JSON.stringify(r).slice(0,80), 5000);
+  } catch(e) { toast('連線失敗: ' + e.message, 5000); }
 }
 function pushSongToCloud(s) {
   if (!State.settings.gasUrl) return Promise.resolve();
@@ -1875,6 +1901,7 @@ function bind() {
     if (State.settings.gasUrl) syncFromGAS();
   });
   $('#btn-resync').addEventListener('click', syncFromGAS);
+  $('#btn-test-gas').addEventListener('click', testGasConnection);
   $('#btn-cloud-sync').addEventListener('click', () => {
     if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
     syncFromGAS();
