@@ -38,26 +38,32 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%;overflow:hidden;-webkit-text-size-adjust:100%}
 body{height:100%;color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:15px;overflow:hidden;-webkit-font-smoothing:antialiased;
-  background:linear-gradient(180deg,#0a0420 0%,#160a3a 100%);
-  background-attachment:fixed;transition:background 1.4s ease;
+  background:#0e0e12;background-attachment:fixed;transition:background 1.4s ease;
 }
 #bg-fx{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
-.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;mix-blend-mode:screen;will-change:transform,opacity}
-.orb.o1{width:70vmax;height:70vmax;background:var(--hot);top:-20vmax;left:-25vmax;animation:o1 24s ease-in-out infinite}
-.orb.o2{width:60vmax;height:60vmax;background:var(--accent);bottom:-15vmax;right:-15vmax;animation:o2 30s ease-in-out infinite}
-.orb.o3{width:50vmax;height:50vmax;background:var(--accent2);top:25vmax;right:20vmax;animation:o3 20s ease-in-out infinite}
-.orb.o4{width:35vmax;height:35vmax;background:#fff;opacity:.05;top:50vmax;left:30vmax;animation:o4 26s linear infinite}
-@keyframes o1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(15vmax,18vmax) scale(1.2)}}
-@keyframes o2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-12vmax,-15vmax) scale(1.15)}}
-@keyframes o3{0%,100%{transform:translate(0,0) scale(.9)}50%{transform:translate(-22vmax,8vmax) scale(1.15)}}
-@keyframes o4{from{transform:translate(0,0) rotate(0)}to{transform:translate(0,0) rotate(360deg)}}
-body.playing .orb{opacity:.85}
-body.playing .o1{animation-duration:6s}
-body.playing .o2{animation-duration:8s}
-body.playing .o3{animation-duration:5s}
-body.playing .o4{animation-duration:9s}
-body.playing #bg-fx{animation:bg-pulse .55s ease-in-out infinite}
-@keyframes bg-pulse{0%,100%{filter:saturate(1) brightness(1)}50%{filter:saturate(1.6) brightness(1.18)}}
+.metal-base{position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -10%, color-mix(in srgb, var(--accent) 20%, #1d1d24) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 50% 110%, color-mix(in srgb, var(--accent2) 12%, #0a0a0e) 0%, transparent 60%),
+    linear-gradient(180deg, #1c1c22 0%, #0e0e14 50%, #15151a 100%);
+  transition:background 1.4s ease;
+}
+.metal-brush{position:absolute;inset:0;mix-blend-mode:overlay;opacity:.6;
+  background:
+    repeating-linear-gradient(180deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.008) 0 1px, transparent 1px 5px);
+}
+.metal-gloss{position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 25% at 50% -8%, rgba(255,255,255,.08), transparent 70%),
+    radial-gradient(ellipse 50% 18% at 20% 50%, rgba(255,255,255,.025), transparent 70%);
+}
+.metal-sheen{position:absolute;left:-30%;top:0;width:50%;height:100%;
+  background:linear-gradient(100deg, transparent 30%, rgba(255,255,255,.04) 48%, rgba(255,255,255,.07) 50%, rgba(255,255,255,.04) 52%, transparent 70%);
+  animation:sheen 14s linear infinite;will-change:transform;
+}
+@keyframes sheen{from{transform:translateX(0)}to{transform:translateX(260%)}}
+body.playing .metal-sheen{animation-duration:7s}
 body.playing .np-ctrl .play{animation:play-glow .85s ease-in-out infinite}
 @keyframes play-glow{0%,100%{box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 50%,transparent),0 0 0 0 transparent}50%{box-shadow:0 8px 36px var(--accent),0 0 28px 14px color-mix(in srgb,var(--accent) 35%,transparent)}}
 body.playing .logo{animation:play-glow 1s ease-in-out infinite}
@@ -200,6 +206,10 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
 .lyr-tr{font-size:13px;color:var(--accent2);margin-top:3px;font-weight:400}
 .lyr-ex{font-size:12px;color:var(--text3);margin-top:2px;font-style:italic}
 .lyr-empty{color:var(--text3);font-size:13px;text-align:center;padding:30px 20px}
+.lrc-tune{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0 4px;font-size:12px;color:var(--text2)}
+.lrc-tune .btn{padding:6px 10px;font-size:12px;min-height:auto;border-radius:18px}
+.lrc-tune .offset-lbl{font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--glass);border:1px solid var(--glass-br);border-radius:14px;padding:4px 10px;min-width:80px;text-align:center}
+.lyr-box.calib{border:2px dashed var(--accent2);border-radius:14px;padding:10px}
 
 /* Library */
 .lib-search{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,rgba(10,4,32,.92) 0%,rgba(10,4,32,.7) 80%,transparent 100%);backdrop-filter:blur(12px);margin:-14px -14px 8px;padding:14px 14px 8px}
@@ -293,7 +303,10 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
 </head>
 <body>
 <div id="bg-fx" aria-hidden="true">
-  <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="orb o4"></div>
+  <div class="metal-base"></div>
+  <div class="metal-brush"></div>
+  <div class="metal-gloss"></div>
+  <div class="metal-sheen"></div>
 </div>
 <div id="app">
   <header>
@@ -393,6 +406,13 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
           </div>
           <div class="lyr-box" id="lyr-box">
             <div class="lyr-empty">尚無歌詞，點 📝 貼 LRC、🌐 自動抓、或 ✨ AI 生成</div>
+          </div>
+          <div class="lrc-tune">
+            <button class="btn dim" id="btn-lrc-back" title="歌詞早 0.5 秒">⏪ 早0.5s</button>
+            <span class="offset-lbl" id="lrc-offset">0.0s</span>
+            <button class="btn dim" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">⏩ 晚0.5s</button>
+            <button class="btn dim" id="btn-lrc-reset" title="重設偏移">重設</button>
+            <button class="btn" id="btn-lrc-calib" title="點當下歌詞自動校正">🎯 點句校正</button>
           </div>
         </div>
       </div>
@@ -889,6 +909,7 @@ function playSong(id) {
   art.classList.remove('empty');
   $('#vinyl-art').style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
   parseLyrics(s.lrc || '');
+  updateLrcOffsetLabel();
   setupMediaSession(s);
   if (!s.lrc) autoFetchLrcSilent(s);
   // restore AB & speed per-song? keep global speed, reset AB
@@ -1094,6 +1115,8 @@ function renderLyrics() {
   }).join('');
   box.querySelectorAll('.lyr-line').forEach(el => {
     el.addEventListener('click', () => {
+      const i = +el.dataset.i;
+      if (State.lrcCalibMode) { calibrateAt(i); return; }
       const t = +el.dataset.t;
       if (t >= 0 && State.player && State.player.seekTo) State.player.seekTo(t, true);
     });
@@ -1101,10 +1124,12 @@ function renderLyrics() {
 }
 function syncLyric(t) {
   if (!State.lyrics.length) return;
+  const offset = (getCur()?.lrcOffset) || 0;
+  const adjT = t - offset;
   let idx = -1;
   for (let i = 0; i < State.lyrics.length; i++) {
     if (State.lyrics[i].t < 0) continue;
-    if (State.lyrics[i].t <= t) idx = i; else break;
+    if (State.lyrics[i].t <= adjT) idx = i; else break;
   }
   if (idx === State.activeLyricIdx) return;
   State.activeLyricIdx = idx;
@@ -1114,6 +1139,50 @@ function syncLyric(t) {
     const el = box.querySelector(`.lyr-line[data-i="${idx}"]`);
     if (el) { el.classList.add('active'); el.scrollIntoView({ behavior:'smooth', block:'center' }); }
   }
+}
+
+function updateLrcOffsetLabel() {
+  const s = getCur();
+  const o = (s && s.lrcOffset) || 0;
+  const lbl = $('#lrc-offset');
+  if (lbl) lbl.textContent = (o>=0 ? '+' : '') + o.toFixed(1) + 's';
+}
+function shiftLrc(delta) {
+  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
+  s.lrcOffset = Math.round(((s.lrcOffset || 0) + delta) * 10) / 10;
+  saveSongsLocal(); pushSongToCloud(s);
+  updateLrcOffsetLabel();
+  State.activeLyricIdx = -2; // 強制重新套用
+  if (State.player && State.player.getCurrentTime) syncLyric(State.player.getCurrentTime() || 0);
+  toast('偏移 ' + (s.lrcOffset>=0?'+':'') + s.lrcOffset.toFixed(1) + 's');
+}
+function resetLrcOffset() {
+  const s = getCur(); if (!s) return;
+  s.lrcOffset = 0; saveSongsLocal(); pushSongToCloud(s);
+  updateLrcOffsetLabel();
+  State.activeLyricIdx = -2;
+  if (State.player && State.player.getCurrentTime) syncLyric(State.player.getCurrentTime() || 0);
+  toast('偏移已重設');
+}
+function toggleCalib() {
+  State.lrcCalibMode = !State.lrcCalibMode;
+  $('#lyr-box').classList.toggle('calib', State.lrcCalibMode);
+  $('#btn-lrc-calib').classList.toggle('on', State.lrcCalibMode);
+  toast(State.lrcCalibMode ? '校正模式 ON：點目前正在唱的那行' : '校正模式 OFF', 2200);
+}
+function calibrateAt(idx) {
+  const s = getCur(); if (!s) return;
+  if (!State.player || !State.player.getCurrentTime) return;
+  const lyric = State.lyrics[idx]; if (!lyric || lyric.t < 0) return;
+  const now = State.player.getCurrentTime() || 0;
+  s.lrcOffset = Math.round((now - lyric.t) * 10) / 10;
+  saveSongsLocal(); pushSongToCloud(s);
+  updateLrcOffsetLabel();
+  State.activeLyricIdx = -2; syncLyric(now);
+  State.lrcCalibMode = false;
+  $('#lyr-box').classList.remove('calib');
+  $('#btn-lrc-calib').classList.remove('on');
+  toast('已校正 偏移 ' + (s.lrcOffset>=0?'+':'') + s.lrcOffset.toFixed(1) + 's');
 }
 
 async function autoFetchLrcSilent(s) {
@@ -1530,6 +1599,10 @@ function bind() {
 
   $('#btn-refetch-lrc').addEventListener('click', refetchLyrics);
   $('#btn-translate-all').addEventListener('click', translateAll);
+  $('#btn-lrc-back').addEventListener('click', () => shiftLrc(-0.5));
+  $('#btn-lrc-fwd').addEventListener('click', () => shiftLrc(0.5));
+  $('#btn-lrc-reset').addEventListener('click', resetLrcOffset);
+  $('#btn-lrc-calib').addEventListener('click', toggleCalib);
   $('#btn-current-pl').addEventListener('click', () => {
     if (!State.currentId) { toast('先選一首歌'); return; }
     openSongSheet(State.currentId);
