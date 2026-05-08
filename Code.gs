@@ -160,8 +160,9 @@ function upsertSong(body) {
   const header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   const idx = _idx_(header);
   let id = body['ID'];
-  // 用 YouTubeID 反查避免重複
-  if (!id && body['YouTubeID']) {
+
+  // 反查 YouTubeID 看是否已存在(避免相同影片重複)
+  if ((!id || _findRowById_(sh, id) < 0) && body['YouTubeID']) {
     const lr = sh.getLastRow();
     if (lr >= 2 && idx['YouTubeID'] !== undefined) {
       const vals = sh.getRange(2, idx['YouTubeID'] + 1, lr - 1, 1).getValues();
@@ -170,8 +171,12 @@ function upsertSong(body) {
       }
     }
   }
-  if (!id) {
-    id = _newId_();
+
+  let row = id ? _findRowById_(sh, id) : -1;
+
+  if (!id || row < 0) {
+    // 新增列 (用 client 提供的 ID 或自動產生的)
+    if (!id) id = _newId_();
     const obj = {};
     SONGS_HEADER.forEach(k => obj[k] = body[k] !== undefined ? body[k] : '');
     obj['ID'] = id;
@@ -181,13 +186,8 @@ function upsertSong(body) {
     sh.appendRow(header.map(h => obj[h] !== undefined ? obj[h] : ''));
     return { ok:true, id, created:true };
   }
-  // 更新既有
-  const row = _findRowById_(sh, id);
-  if (row < 0) {
-    // 找不到,當新增
-    body['ID'] = id;
-    return upsertSong(body);
-  }
+
+  // 更新既有列
   Object.keys(body).forEach(k => {
     if (k === 'action' || k === 'callback') return;
     if (idx[k] !== undefined) sh.getRange(row, idx[k] + 1).setValue(body[k]);
