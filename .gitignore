@@ -1,0 +1,8 @@
+node_modules/
+package-lock.json
+.DS_Store
+Thumbs.db
+icon-a.svg
+icon-b.svg
+icon-c.svg
+icon-d.svg

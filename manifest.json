@@ -1,0 +1,16 @@
+{
+  "name": "SONG — 我的音樂語音播放器",
+  "short_name": "SONG",
+  "description": "YouTube 歌單・語音控制・互動歌詞學習",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0420",
+  "theme_color": "#0a0420",
+  "orientation": "portrait-primary",
+  "lang": "zh-TW",
+  "categories": ["music", "entertainment", "education"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
