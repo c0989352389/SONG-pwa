@@ -738,23 +738,49 @@ async function gemini(prompt, opts={}) {
 //============== lrclib ==============
 function _smartSongName(rawTitle, artist) {
   let t = String(rawTitle || '').trim();
-  // 1) 去掉 -Topic
+  const TAG = '高音質|高解析|高清|無損|HD|4K|HQ|Official|MV|M\\/V|Music\\s*Video|Lyrics?|歌詞|完整版|Live|Audio|Visualizer|Cover|Remix|Karaoke|官方版?|純享版|純音版|純伴奏|Inst(?:rumental)?';
+  const OPEN = '[【\\[「『《\\(（]', CLOSE = '[】\\]」』》\\)）]';
+
+  // 1) 反覆剝掉「整個括號裡只有品質標記」的開頭/結尾括號
+  let prev;
+  do {
+    prev = t;
+    t = t.replace(new RegExp('^\\s*' + OPEN + '\\s*(?:' + TAG + ')[^】\\]」』》\\)）]*' + CLOSE + '\\s*', 'i'), '');
+    t = t.replace(new RegExp('\\s*' + OPEN + '[^】\\]」』》\\)）]*(?:' + TAG + ')[^】\\]」』》\\)）]*' + CLOSE + '\\s*$', 'i'), '');
+    t = t.trim();
+  } while (t !== prev && t);
+
+  // 2) 剝掉非括號的尾巴雜字(Official MV 之類)
+  do {
+    prev = t;
+    t = t.replace(new RegExp('[\\s,，·\\-]+(?:' + TAG + ')\\s*$', 'i'), '').trim();
+  } while (t !== prev && t);
+
+  // 3) 去 -Topic 後,若標題開頭/結尾就是歌手名,剝掉
   const cleanArtist = (artist || '').replace(/\s*-\s*Topic$/i,'').trim();
-  // 2) 開頭/結尾的歌手名拿掉
   if (cleanArtist) {
-    const esc = cleanArtist.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    t = t.replace(new RegExp('^\\s*' + esc + '\\s*[-–—:|]?\\s*','i'),'');
-    t = t.replace(new RegExp('\\s*[-–—:|]?\\s*' + esc + '\\s*$','i'),'');
+    const lower = t.toLowerCase(), aLower = cleanArtist.toLowerCase();
+    if (lower.startsWith(aLower)) t = t.slice(cleanArtist.length).replace(/^\s*[-–—:|·]\s*/, '').trim();
+    const lower2 = t.toLowerCase();
+    if (lower2.endsWith(aLower)) t = t.slice(0, -cleanArtist.length).replace(/\s*[-–—:|·]\s*$/, '').trim();
   }
-  // 3) 若括號內有內容,取裡面(常見:歌手【歌名】)
-  const m = t.match(/[【\[「『](.+?)[】\]」』]/);
+
+  // 4) 「歌手 - 歌名」格式,中文情境取右半
+  const dash = t.match(/^(.+?)\s*[-–—|]\s*(.+)$/);
+  if (dash) {
+    const L = dash[1].trim(), R = dash[2].trim();
+    const cnL = /[一-鿿]/.test(L), cnR = /[一-鿿]/.test(R);
+    if (cnL && cnR) t = R;
+  }
+
+  // 5) 剩下的括號,取裡面(現在裡面比較可能是真歌名)
+  const m = t.match(new RegExp(OPEN + '(.+?)' + CLOSE));
   if (m) t = m[1];
-  // 4) 去掉常見尾巴雜字
-  t = t.replace(/[\(（\[【「『][^)）\]】」』]*(?:Official|MV|Music\s*Video|Lyric|HD|4K|Live|Audio|Visualizer|歌詞|完整版|Full|Version|高清|官方)[^)）\]】」』]*[\)）\]】」』]/gi,' ');
-  t = t.replace(/\s*[\(（\[【「『]?\s*(Official|Music\s*Video|MV|HD|4K|Live|Audio|Visualizer|Lyrics?|歌詞|完整版|Full|Version|高清|官方版?)\s*[\)）\]】」』]?.*$/gi,'');
-  // 5) 中英混排取中文部分,例「煙花易冷 Fade Away」→「煙花易冷」
+
+  // 6) 中英混排優先取中文段
   const cn = t.match(/[一-鿿][一-鿿\s·]*[一-鿿]/);
-  if (cn && cn[0].length >= 2) t = cn[0];
+  if (cn && cn[0].length >= 2 && cn[0].length < t.length) t = cn[0];
+
   return t.replace(/\s+/g,' ').trim();
 }
 
