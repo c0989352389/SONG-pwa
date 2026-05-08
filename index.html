@@ -253,6 +253,9 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
         <div class="np-art empty" id="np-art"><span id="np-art-icon">♪</span></div>
         <div class="np-title" id="np-title">尚未選曲</div>
         <div class="np-artist" id="np-artist">點下方收藏選一首，或到「加歌」搜尋</div>
+        <div style="text-align:center;margin-bottom:14px">
+          <button class="btn sm" id="btn-current-pl" style="border-radius:18px">＋ 加入歌單分組</button>
+        </div>
 
         <div class="np-prog">
           <div class="np-bar" id="np-bar">
@@ -306,8 +309,7 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
           <div class="gc-t">
             <span>歌詞・互動學習</span>
             <span class="lyr-tools">
-              <button class="btn sm" id="btn-fetch-lrc" title="從 lrclib 抓">🌐 抓詞</button>
-              <button class="btn sm" id="btn-ai-lrc" title="AI 生成">✨ AI</button>
+              <button class="btn sm" id="btn-refetch-lrc" title="重新多源抓詞">🔁 重抓</button>
               <button class="btn sm" id="btn-translate-all" title="逐句翻譯">🌏 翻譯</button>
             </span>
           </div>
@@ -557,15 +559,29 @@ function gasFromCloudSong(s) {
 async function syncFromGAS() {
   if (!State.settings.gasUrl) return;
   try {
+    // 雙向合併:雲端為主,本地獨有的補回雲端
     const r = await gas('getSongs');
     if (r && r.ok && Array.isArray(r.songs)) {
-      State.songs = r.songs.map(gasFromCloudSong);
+      const cloud = r.songs.map(gasFromCloudSong);
+      const cloudIds = new Set(cloud.map(s => s.id));
+      const cloudVids = new Set(cloud.map(s => s.videoId).filter(Boolean));
+      const localOnly = State.songs.filter(s => !cloudIds.has(s.id) && !cloudVids.has(s.videoId));
+      State.songs = [...cloud, ...localOnly];
       saveSongsLocal(); renderLibrary();
+      // 補推本地獨有
+      for (const s of localOnly) pushSongToCloud(s);
     }
     const p = await gas('getPlaylists');
     if (p && p.ok && Array.isArray(p.playlists)) {
-      State.playlists = p.playlists.map(x => ({ id: x['ID'], name: x['名稱'], sortOrder: Number(x['排序'])||0, color: x['顏色'] || '' }));
+      const cloud = p.playlists.map(x => ({ id: x['ID'], name: x['名稱'], sortOrder: Number(x['排序'])||0, color: x['顏色'] || '' }));
+      const cloudIds = new Set(cloud.map(p => p.id));
+      const localOnly = State.playlists.filter(p => !cloudIds.has(p.id));
+      State.playlists = [...cloud, ...localOnly];
       savePlaylistsLocal(); renderPlaylistTabs();
+      // 補推本地獨有
+      for (const lp of localOnly) {
+        gas('upsertPlaylist', { 'ID': lp.id, '名稱': lp.name, '排序': lp.sortOrder, '顏色': lp.color || '' }).catch(()=>{});
+      }
     }
     toast('雲端已同步');
   } catch(e){ toast('雲端同步失敗：' + e.message); }
@@ -613,12 +629,119 @@ async function lrclibFetch(title, artist, duration) {
       const r = await fetch('https://lrclib.net/api/get?' + params.toString());
       if (r.ok) return await r.json();
     }
-    const sr = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent([title, artist].filter(Boolean).join(' ')));
-    if (sr.ok) {
-      const arr = await sr.json();
-      if (arr.length) return arr[0];
-    }
-  } catch(e){ console.warn('lrclib', e); }
+  } catch(e){ console.warn('lrclib get', e); }
+  return null;
+}
+
+function _cleanTitleForSearch(t) {
+  return (t || '')
+    .replace(/[\(（\[【].*?[\)）\]】]/g, ' ')
+    .replace(/Official|MV|Music\s*Video|Lyrics|歌詞|HD|4K|Live|Audio|Visualizer|完整版/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+async function lrclibSearchFuzzy(title, artist, duration) {
+  const cleanT = _cleanTitleForSearch(title);
+  const cleanA = (artist || '').replace(/\s*-\s*Topic$/i,'').trim();
+  const queries = [
+    cleanT && cleanA ? `${cleanT} ${cleanA}` : '',
+    cleanT && cleanA ? `${cleanA} ${cleanT}` : '',
+    cleanT,
+    title,
+  ].filter(Boolean);
+  for (const q of queries) {
+    try {
+      const r = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q));
+      if (!r.ok) continue;
+      const arr = await r.json();
+      if (!arr || !arr.length) continue;
+      // 依時長相近排序
+      if (duration) arr.sort((a,b) => Math.abs((a.duration||0)-duration) - Math.abs((b.duration||0)-duration));
+      const hit = arr.find(x => x.syncedLyrics) || arr.find(x => x.plainLyrics) || arr[0];
+      if (hit && (hit.syncedLyrics || hit.plainLyrics)) return hit;
+    } catch(_){}
+  }
+  return null;
+}
+
+function _cleanLrcOutput(txt) {
+  if (!txt) return '';
+  let t = txt.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
+  return t.split(/\r?\n/).filter(L => /^\s*\[\d{1,2}:\d{1,2}/.test(L)).join('\n');
+}
+function _countLrcLines(lrc) { return (lrc.match(/^\s*\[\d/gm) || []).length; }
+
+async function aiConvertPlainToLrc(s, plain) {
+  const dur = State.duration || 0;
+  const prompt = `請為下列歌詞配上 LRC 時間戳。歌曲總長 ${Math.round(dur)} 秒。
+
+規則：
+- 第一行從 [00:00.00] 或合理前奏（5-15 秒）開始
+- 平均分配時間,留 5-10% 給結尾
+- 重複的副歌每次都要單獨給時間戳
+- 不可省略任何一行
+- 嚴格輸出純 LRC,每行 [mm:ss.xx]歌詞
+- 不要 markdown,不要說明,不要前言後語
+
+歌詞原文：
+${plain}`;
+  return _cleanLrcOutput(await gemini(prompt, { temp: 0.1, max: 16000 }));
+}
+
+async function aiSearchAndGenerateLrc(s) {
+  const dur = State.duration || 0;
+  const prompt = `任務:為這首歌提供完整真實的 LRC 同步歌詞。
+
+歌曲：${s.title} - ${s.artist || ''}
+${dur ? '長度：' + Math.round(dur) + ' 秒' : ''}
+
+執行：
+1. 用 Google 搜尋找出完整歌詞（試「${s.title} ${s.artist || ''} 歌詞」「${s.title} lyrics」）
+2. 完整提取所有歌詞段落（主歌、副歌、橋段、重複段都要）
+3. 平均分配 LRC 時間戳到歌曲長度範圍內
+4. 嚴格輸出 LRC,每行 [mm:ss.xx]歌詞,無其他文字
+
+絕對不要：
+- markdown 包裹
+- 任何說明、前言、總結
+- 縮減或省略歌詞行
+
+直接輸出 LRC：`;
+  return _cleanLrcOutput(await gemini(prompt, { temp: 0.15, max: 16000, googleSearch: true }));
+}
+
+async function fetchLyricsAuto(s, opts={}) {
+  const dur = State.duration || 0;
+  const minLines = dur > 60 ? Math.max(10, Math.floor(dur/10)) : 6;
+
+  // 1) lrclib 精確
+  let r = await lrclibFetch(s.title, s.artist, dur);
+  if (r?.syncedLyrics) return { source:'lrclib', lrc: r.syncedLyrics };
+  let plain = r?.plainLyrics || '';
+
+  // 2) lrclib 模糊搜尋
+  r = await lrclibSearchFuzzy(s.title, s.artist, dur);
+  if (r?.syncedLyrics) return { source:'lrclib-search', lrc: r.syncedLyrics };
+  if (r?.plainLyrics) plain = plain || r.plainLyrics;
+
+  // 3) 用 AI 把 plain 補時間戳
+  if (plain && State.settings.geminiKey) {
+    try {
+      const lrc = await aiConvertPlainToLrc(s, plain);
+      if (_countLrcLines(lrc) >= minLines) return { source:'ai-timed', lrc };
+    } catch(e){ console.warn('aiConvert', e); }
+  }
+
+  // 4) AI 用 Google Search 直接生成
+  if (State.settings.geminiKey) {
+    try {
+      const lrc = await aiSearchAndGenerateLrc(s);
+      if (_countLrcLines(lrc) >= minLines) return { source:'ai-search', lrc };
+    } catch(e){ console.warn('aiSearch', e); }
+  }
+
+  // 5) 最差就用純文字
+  if (plain) return { source:'plain', lrc: plain };
   return null;
 }
 
@@ -887,64 +1010,27 @@ async function autoFetchLrcSilent(s) {
   setTimeout(async () => {
     if (s.lrc) return;
     try {
-      const r = await lrclibFetch(s.title, s.artist, State.duration);
+      const r = await fetchLyricsAuto(s);
       if (!r) return;
-      const lrc = r.syncedLyrics || r.plainLyrics || '';
-      if (!lrc) return;
-      s.lrc = lrc;
-      saveSongsLocal();
-      pushSongToCloud(s);
-      if (State.currentId === s.id) { parseLyrics(lrc); toast('自動載入歌詞 ✓', 1500); }
-    } catch(_){}
+      s.lrc = r.lrc; saveSongsLocal(); pushSongToCloud(s);
+      if (State.currentId === s.id) {
+        parseLyrics(r.lrc);
+        toast('歌詞已自動載入 [' + r.source + '] ✓', 2000);
+      }
+    } catch(e){ console.warn('autoFetchLrc', e); }
   }, 2500);
 }
 
-async function fetchLrclib() {
+async function refetchLyrics() {
   const s = getCur(); if (!s) { toast('先選一首歌'); return; }
-  toast('搜尋歌詞中…');
-  const r = await lrclibFetch(s.title, s.artist, State.duration);
-  if (!r) { toast('lrclib 沒找到，可改用 ✨ AI 生成'); return; }
-  const lrc = r.syncedLyrics || r.plainLyrics || '';
-  if (!lrc) { toast('找到但沒歌詞'); return; }
-  s.lrc = lrc; saveSongsLocal(); parseLyrics(lrc); pushSongToCloud(s);
-  toast(r.syncedLyrics ? '同步歌詞已載入' : '純文字歌詞已載入');
-}
-async function aiGenerateLrc() {
-  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
-  if (!State.settings.geminiKey) { toast('請先到 ⚙ 設定 Gemini API Key'); return; }
-  toast('AI 搜尋並生成完整歌詞中…(20~40秒)', 4000);
-  const dur = State.duration || 0;
-  const prompt = `任務：為以下歌曲提供完整、真實的 LRC 同步歌詞。
-
-歌曲資訊：
-- 歌名：${s.title}
-- 歌手：${s.artist || '未知'}
-${dur ? '- 總長度：' + Math.round(dur) + ' 秒' : ''}
-
-執行步驟：
-1. 先用 Google 搜尋「${s.title} ${s.artist || ''} 歌詞 lyrics」找到真實完整歌詞
-2. 將完整歌詞（包含所有主歌、副歌、橋段、重複段落）按合理節奏分行
-3. 依據歌曲總長度將時間戳均勻分配到每一行（前奏約佔總長 5-10%，留給間奏 5-10%）
-4. 輸出嚴格的 LRC 純文字格式，每行：[mm:ss.xx]歌詞文字
-
-格式要求（極重要）：
-- 不要輸出任何說明、前言、結語
-- 不要 markdown 包裹（不要 \`\`\`）
-- 不要任何引述或註解
-- 只輸出 LRC 行，第一行從 [00:00.00] 開始或合理前奏時間
-- 必須包含整首歌的所有歌詞行（典型 30-80 行）
-
-直接輸出：`;
+  toast('多源抓詞中…(可能需 10-30 秒)', 4000);
+  s._lrcTried = false;
   try {
-    let txt = await gemini(prompt, { temp: 0.2, max: 8000, googleSearch: true });
-    txt = txt.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
-    // 過濾出有時間戳的行
-    const lines = txt.split(/\r?\n/).filter(L => /^\s*\[\d{1,2}:\d{1,2}/.test(L));
-    if (lines.length < 5) { toast('AI 沒生出夠多歌詞,可改用 🌐 抓詞或手動貼'); return; }
-    const lrc = lines.join('\n');
-    s.lrc = lrc; saveSongsLocal(); parseLyrics(lrc); pushSongToCloud(s);
-    toast('AI 已生成 ' + lines.length + ' 行歌詞');
-  } catch(e) { toast('AI 失敗：' + e.message); }
+    const r = await fetchLyricsAuto(s);
+    if (!r) { toast('所有來源都找不到,請手動貼歌詞'); return; }
+    s.lrc = r.lrc; saveSongsLocal(); parseLyrics(r.lrc); pushSongToCloud(s);
+    toast('歌詞已載入 [' + r.source + '] ✓ ' + _countLrcLines(r.lrc) + ' 行');
+  } catch(e) { toast('抓詞失敗：' + e.message); }
 }
 async function translateAll() {
   const s = getCur(); if (!s) { toast('先選一首歌'); return; }
@@ -1094,8 +1180,12 @@ function openSongSheet(id) {
   $('#sheet-body').innerHTML = `
     <div style="margin-bottom:14px">
       <div class="gc-t">所屬歌單（可多選）</div>
-      <div id="sheet-pls">
-        ${pls.length ? pls.map(p => `<span class="chip ${s.playlistIds.includes(p.id)?'active':''}" data-pl="${p.id}">${escapeHtml(p.name)}</span>`).join('') : '<div class="lyr-empty" style="padding:10px">還沒有歌單分組,可到歌單頁右側「＋管理」建立</div>'}
+      <div id="sheet-pls" style="margin-bottom:10px">
+        ${pls.length ? pls.map(p => `<span class="chip ${s.playlistIds.includes(p.id)?'active':''}" data-pl="${p.id}">${escapeHtml(p.name)}</span>`).join('') : '<div class="lyr-empty" style="padding:6px 0">尚無歌單分組</div>'}
+      </div>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="sheet-newpl" placeholder="快速新建歌單" style="flex:1">
+        <button class="btn pri sm" id="sheet-create-pl">建立並加入</button>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1112,6 +1202,24 @@ function openSongSheet(id) {
     pushSongToCloud(s);
     renderLibrary();
   }));
+  const createBtn = $('#sheet-body').querySelector('#sheet-create-pl');
+  if (createBtn) createBtn.addEventListener('click', async () => {
+    const name = $('#sheet-newpl').value.trim();
+    if (!name) return;
+    const p = { id: uid('pl'), name, sortOrder: State.playlists.length, color: '' };
+    State.playlists.push(p);
+    s.playlistIds = s.playlistIds || [];
+    s.playlistIds.push(p.id);
+    savePlaylistsLocal(); saveSongsLocal();
+    if (State.settings.gasUrl) {
+      gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': '' }).catch(()=>{});
+      pushSongToCloud(s);
+    }
+    renderPlaylistTabs(); renderLibrary(); openSongSheet(s.id);
+    toast('已建立並加入「' + name + '」');
+  });
+  const newPlInp = $('#sheet-body').querySelector('#sheet-newpl');
+  if (newPlInp) newPlInp.addEventListener('keydown', e => { if (e.key === 'Enter' && createBtn) createBtn.click(); });
   $('#sheet-body').querySelector('[data-sheet-act="play"]').addEventListener('click', () => {
     closeSheet(); playSong(s.id); switchPage('player');
   });
@@ -1344,9 +1452,12 @@ function bind() {
   $('#btn-ab-loop').addEventListener('click', toggleAbLoop);
   $('#btn-ab-clear').addEventListener('click', clearAb);
 
-  $('#btn-fetch-lrc').addEventListener('click', fetchLrclib);
-  $('#btn-ai-lrc').addEventListener('click', aiGenerateLrc);
+  $('#btn-refetch-lrc').addEventListener('click', refetchLyrics);
   $('#btn-translate-all').addEventListener('click', translateAll);
+  $('#btn-current-pl').addEventListener('click', () => {
+    if (!State.currentId) { toast('先選一首歌'); return; }
+    openSongSheet(State.currentId);
+  });
 
   const bar = $('#np-bar');
   function barPct(clientX) {
