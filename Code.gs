@@ -6,7 +6,7 @@
  *   1. 將 SHEET_ID 替換為你的試算表 ID
  *   2. 試算表會自動建立 4 個分頁
  */
-const SHEET_ID = 'PUT_YOUR_SHEET_ID_HERE';
+const SHEET_ID = '1THqrOQNwSGeYrlVvx9j928iEwptESlH-pvdyMxMfLMU';
 
 const SONGS_SHEET = '歌單';
 const SONGS_HEADER = ['ID','歌名','歌手','YouTubeID','縮圖','時長','加入時間','標籤','播放次數','最後播放','歌詞LRC','備註','翻譯JSON','解釋JSON','段落JSON','歌單IDs','BPM','歌詞偏移'];
