@@ -1,5 +1,6 @@
 node_modules/
 package-lock.json
+.clasprc.json
 .DS_Store
 Thumbs.db
 icon-a.svg

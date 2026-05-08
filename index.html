@@ -454,8 +454,9 @@ body.mode-lyrics #np-vis{display:none}
 
     <section class="page" id="page-add">
       <div class="search-tabs">
-        <button class="active" data-tab="recommend">✨ 推薦歌曲</button>
-        <button data-tab="url">貼網址</button>
+        <button class="active" data-tab="recommend">✨ 推薦</button>
+        <button data-tab="search">🔍 搜尋</button>
+        <button data-tab="url">🔗 網址</button>
       </div>
       <div id="tab-recommend">
         <div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
@@ -467,6 +468,15 @@ body.mode-lyrics #np-vis{display:none}
         </div>
         <div class="results" id="rec-results">
           <div class="empty"><div class="empty-i">✨</div><div class="empty-t">按上方「取得推薦」依你的歌單口味推薦新歌</div></div>
+        </div>
+      </div>
+      <div id="tab-search" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="text" id="yt-q" placeholder="輸入歌名 / 歌手關鍵字" style="flex:1">
+          <button class="btn pri" id="btn-yt-search">搜尋</button>
+        </div>
+        <div class="results" id="yt-results">
+          <div class="empty"><div class="empty-i">🔍</div><div class="empty-t">輸入關鍵字直接搜 YouTube</div></div>
         </div>
       </div>
       <div id="tab-url" style="display:none">
@@ -1729,12 +1739,27 @@ ${seed ? '\n使用者額外要求風格: ' + seed : ''}
 5. 嚴格輸出 JSON 陣列,無 markdown,無前後文字:
 [{"title":"歌名","artist":"歌手","reason":"推薦理由"}, ...]`;
   let txt = await gemini(prompt, { temp: 0.8, max: 4000 });
-  txt = txt.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
-  // 找出 JSON 陣列範圍
+  txt = txt.replace(/```[\w]*\n?/g, '').trim();
   const start = txt.indexOf('[');
   const end = txt.lastIndexOf(']');
-  if (start < 0 || end < 0) throw new Error('AI 回傳格式不對');
-  return JSON.parse(txt.slice(start, end + 1));
+  if (start < 0 || end < 0) throw new Error('AI 沒回 JSON: ' + txt.slice(0,80));
+  let json = txt.slice(start, end + 1);
+  // 修常見格式問題
+  json = json
+    .replace(/[“”]/g, '"')   // smart 雙引號
+    .replace(/[‘’]/g, "'")    // smart 單引號
+    .replace(/,(\s*[\]}])/g, '$1');     // 尾隨逗號
+  try { return JSON.parse(json); }
+  catch(e) {
+    // 最後備援:逐筆掃描 {...} 物件
+    const objs = json.match(/\{[^{}]*\}/g);
+    if (objs) {
+      const parsed = [];
+      for (const o of objs) { try { parsed.push(JSON.parse(o)); } catch(_){} }
+      if (parsed.length) return parsed;
+    }
+    throw new Error('AI 格式仍不對: ' + e.message);
+  }
 }
 
 async function loadRecommendations(seed) {
@@ -1988,10 +2013,37 @@ function bind() {
   $$('.search-tabs button').forEach(b => b.addEventListener('click', () => {
     $$('.search-tabs button').forEach(x => x.classList.toggle('active', x === b));
     $('#tab-recommend').style.display = b.dataset.tab === 'recommend' ? '' : 'none';
+    $('#tab-search').style.display = b.dataset.tab === 'search' ? '' : 'none';
     $('#tab-url').style.display = b.dataset.tab === 'url' ? '' : 'none';
   }));
   $('#btn-load-rec').addEventListener('click', () => loadRecommendations($('#rec-seed').value.trim()));
   $('#rec-seed').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-load-rec').click(); });
+  $('#btn-yt-search').addEventListener('click', async () => {
+    const q = $('#yt-q').value.trim(); if (!q) return;
+    const list = $('#yt-results');
+    list.innerHTML = '<div class="empty"><div class="empty-t"><span class="spinner"></span> 搜尋中…</div></div>';
+    let items = [];
+    try { items = await searchYouTube(q); } catch(e){ list.innerHTML = '<div class="empty"><div class="empty-t">搜尋失敗：' + escapeHtml(e.message) + '</div></div>'; return; }
+    if (!items.length) { list.innerHTML = '<div class="empty"><div class="empty-t">沒結果</div></div>'; return; }
+    const existingVids = new Set(State.songs.map(s => s.videoId));
+    list.innerHTML = items.map(it => {
+      const dup = existingVids.has(it.videoId);
+      return `<div class="result-row">
+        <img src="${it.thumb}" alt="">
+        <div class="song-info">
+          <div class="song-title">${escapeHtml(it.title)}</div>
+          <div class="song-meta">${escapeHtml(it.artist)}${dup ? ' <span class="song-tag">已收藏</span>' : ''}</div>
+        </div>
+        <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}" ${dup?'disabled':''}>${dup?'✓':'＋'}</button>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('button[data-vid]').forEach(b => b.addEventListener('click', async () => {
+      b.disabled = true; b.textContent = '…';
+      await addSong({ videoId: b.dataset.vid, title: b.dataset.title, artist: b.dataset.artist, thumb: b.dataset.thumb });
+      b.textContent = '✓';
+    }));
+  });
+  $('#yt-q').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-yt-search').click(); });
   $('#btn-add-url').addEventListener('click', addByUrl);
 
   $('#btn-settings').addEventListener('click', () => {
