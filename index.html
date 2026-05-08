@@ -102,23 +102,55 @@ input::placeholder,textarea::placeholder{color:var(--text3)}
 textarea{resize:vertical;min-height:120px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6}
 label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-spacing:.5px}
 
-/* Now Playing */
+/* Now Playing - Vinyl */
 .np-stage{padding:8px 4px 4px}
-.np-art{position:relative;width:100%;aspect-ratio:1/1;max-width:340px;margin:0 auto 18px;border-radius:24px;overflow:hidden;background:var(--glass);border:1px solid var(--glass-br);box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.np-art img{width:100%;height:100%;object-fit:cover;filter:saturate(1.1)}
-.np-art.empty{display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:48px}
-.np-art.playing::after{content:'';position:absolute;inset:0;border:2px solid var(--accent);border-radius:24px;animation:pulse 2s infinite;pointer-events:none}
-.eq{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px;align-items:flex-end;height:42px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:2}
-.np-art.playing .eq{opacity:.9}
-.eq span{width:6px;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:3px;box-shadow:0 0 8px color-mix(in srgb,var(--accent) 60%,transparent);transform-origin:bottom;animation:eq-bar .5s ease-in-out infinite alternate}
-.eq span:nth-child(1){height:30%;animation-duration:.41s}
-.eq span:nth-child(2){height:80%;animation-duration:.55s;animation-delay:-.1s}
-.eq span:nth-child(3){height:50%;animation-duration:.37s;animation-delay:-.2s}
-.eq span:nth-child(4){height:90%;animation-duration:.48s;animation-delay:-.05s}
-.eq span:nth-child(5){height:65%;animation-duration:.6s;animation-delay:-.15s}
-.eq span:nth-child(6){height:40%;animation-duration:.43s;animation-delay:-.07s}
-.eq span:nth-child(7){height:75%;animation-duration:.52s;animation-delay:-.18s}
-@keyframes eq-bar{from{transform:scaleY(.2)}to{transform:scaleY(1)}}
+.np-art{position:relative;width:100%;aspect-ratio:1/1;max-width:360px;margin:8px auto 22px;background:transparent;border:none;overflow:visible}
+.np-art .empty-label{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:var(--text3);font-size:64px;pointer-events:none}
+.np-art.empty .empty-label{display:flex}
+.np-art.empty .vinyl-disc,.np-art.empty .vinyl-arm{opacity:.18}
+
+.vinyl-disc{
+  position:absolute;inset:6% 6% 6% 6%;border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 26%, rgba(20,18,30,.95) 27%, rgba(8,6,14,.98) 100%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.04) 0 1px, transparent 1px 5px);
+  box-shadow:0 25px 60px rgba(0,0,0,.7),inset 0 0 70px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.06);
+  animation:vinyl-spin 5.6s linear infinite;animation-play-state:paused;
+  z-index:1;
+}
+.np-art.playing .vinyl-disc{animation-play-state:running}
+.vinyl-disc::before{
+  content:'';position:absolute;inset:0;border-radius:50%;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.18), transparent 35%),
+    radial-gradient(circle at 70% 75%, rgba(255,255,255,.08), transparent 30%);
+  pointer-events:none;
+}
+.vinyl-art{
+  position:absolute;top:50%;left:50%;width:52%;height:52%;
+  border-radius:50%;
+  background-size:cover;background-position:center;background-color:#222;
+  transform:translate(-50%,-50%);
+  box-shadow:0 0 0 3px #0a0420,0 0 0 4px var(--accent),0 0 24px color-mix(in srgb,var(--accent) 50%,transparent);
+  transition:box-shadow 1s;
+}
+.vinyl-art::after{
+  content:'';position:absolute;top:50%;left:50%;width:11%;height:11%;
+  background:radial-gradient(circle at 30% 30%, #777, #111 70%);
+  border-radius:50%;transform:translate(-50%,-50%);
+  box-shadow:0 0 0 2px #000,inset 0 0 4px rgba(255,255,255,.5);
+}
+@keyframes vinyl-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+.vinyl-arm{
+  position:absolute;top:-6%;right:-4%;width:42%;height:60%;
+  transform-origin:88% 14%;
+  transform:rotate(-32deg);
+  transition:transform .9s cubic-bezier(.4,.0,.2,1);
+  z-index:3;pointer-events:none;
+  filter:drop-shadow(0 6px 8px rgba(0,0,0,.5));
+}
+.np-art.playing .vinyl-arm{transform:rotate(-6deg)}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent)}50%{box-shadow:0 0 0 14px transparent}}
 .np-title{font-size:20px;font-weight:600;text-align:center;margin-bottom:4px;line-height:1.3;padding:0 8px;word-break:break-word}
 .np-artist{font-size:13px;color:var(--text2);text-align:center;margin-bottom:18px}
@@ -277,8 +309,28 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
       <div class="np-stage">
         <div class="np-player-vis" id="np-vis"><div id="yt-iframe-mount"></div></div>
         <div class="np-art empty" id="np-art">
-          <span id="np-art-icon">♪</span>
-          <div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div>
+          <svg class="vinyl-arm" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="armG" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#e8e8ea"/>
+                <stop offset="50%" stop-color="#9a9a9e"/>
+                <stop offset="100%" stop-color="#5a5a5e"/>
+              </linearGradient>
+              <radialGradient id="pivotG" cx="50%" cy="40%">
+                <stop offset="0%" stop-color="#cfcfd2"/>
+                <stop offset="60%" stop-color="#5a5a5e"/>
+                <stop offset="100%" stop-color="#1a1a1c"/>
+              </radialGradient>
+            </defs>
+            <circle cx="86" cy="14" r="13" fill="url(#pivotG)" stroke="#000" stroke-width="1"/>
+            <circle cx="86" cy="14" r="5" fill="#1a1a1c"/>
+            <line x1="86" y1="14" x2="32" y2="108" stroke="url(#armG)" stroke-width="7" stroke-linecap="round"/>
+            <line x1="86" y1="14" x2="32" y2="108" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/>
+            <rect x="20" y="100" width="22" height="18" rx="3" fill="#2a2a2e" stroke="#000" stroke-width="1" transform="rotate(-30 31 109)"/>
+            <rect x="22" y="116" width="18" height="4" fill="#000" transform="rotate(-30 31 118)"/>
+          </svg>
+          <span class="empty-label">♪</span>
         </div>
         <div class="np-title" id="np-title">尚未選曲</div>
         <div class="np-artist" id="np-artist">點下方收藏選一首，或到「加歌」搜尋</div>
@@ -835,7 +887,7 @@ function playSong(id) {
   $('#np-artist').textContent = s.artist || '';
   const art = $('#np-art');
   art.classList.remove('empty');
-  art.innerHTML = s.thumb ? `<img src="${s.thumb}" alt="">` : '<span>♪</span>';
+  $('#vinyl-art').style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
   parseLyrics(s.lrc || '');
   setupMediaSession(s);
   if (!s.lrc) autoFetchLrcSilent(s);
@@ -918,7 +970,7 @@ async function autoFallback(s) {
   saveSongsLocal(); pushSongToCloud(s);
   $('#np-title').textContent = s.title;
   $('#np-artist').textContent = s.artist || '';
-  $('#np-art').innerHTML = `<img src="${s.thumb}" alt=""><div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>`;
+  $('#vinyl-art').style.backgroundImage = `url('${s.thumb}')`;
   toast('已換版本: ' + (alt.title || ''));
   if (State.player && State.player.loadVideoById) State.player.loadVideoById(alt.videoId);
 }
@@ -1598,7 +1650,7 @@ async function init() {
     State.currentId = lastId;
     $('#np-title').textContent = s.title || ''; $('#np-artist').textContent = s.artist || '';
     const art = $('#np-art'); art.classList.remove('empty');
-    art.innerHTML = s.thumb ? `<img src="${s.thumb}">` : '<span>♪</span>';
+    $('#vinyl-art').style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
     parseLyrics(s.lrc || '');
   }
   if ('serviceWorker' in navigator) {
