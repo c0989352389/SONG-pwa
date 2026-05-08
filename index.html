@@ -434,6 +434,7 @@ body.mode-lyrics #np-vis{display:none}
             <button class="btn dim" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">⏩ 晚0.5s</button>
             <button class="btn dim" id="btn-lrc-reset" title="重設偏移">重設</button>
             <button class="btn" id="btn-lrc-calib" title="點當下歌詞自動校正">🎯 點句校正</button>
+            <button class="btn danger" id="btn-lrc-wrong" title="標記歌詞錯誤,用修正後的歌名重找">🚫 報錯</button>
           </div>
         </div>
       </div>
@@ -544,6 +545,29 @@ body.mode-lyrics #np-vis{display:none}
       <div class="modal-foot">
         <button class="btn dim" data-close>取消</button>
         <button class="btn pri" id="btn-save-lrc">儲存歌詞</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report wrong lyrics -->
+  <div class="modal" id="modal-wrong">
+    <div class="modal-card">
+      <div class="modal-h"><h3>🚫 標記歌詞錯誤,重找</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">
+        當前歌詞會被加入「拒絕清單」,以後不會再被選到。<br>
+        修正下方歌名 / 歌手讓搜尋更準。
+      </div>
+      <div class="modal-row">
+        <label>歌名</label>
+        <input type="text" id="wrong-title" placeholder="e.g. 雙棲動物">
+      </div>
+      <div class="modal-row">
+        <label>歌手</label>
+        <input type="text" id="wrong-artist" placeholder="e.g. 蔡健雅">
+      </div>
+      <div class="modal-foot">
+        <button class="btn dim" data-close>取消</button>
+        <button class="btn pri" id="btn-wrong-submit">重新搜尋</button>
       </div>
     </div>
   </div>
@@ -1044,39 +1068,94 @@ ${dur ? '長度:' + Math.round(dur) + ' 秒' : ''}
   return _cleanLrcOutput(out);
 }
 
+function _lrcHash(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/\[\d{1,2}:\d{1,2}(?:[.:]\d{1,3})?\]/g, '')
+    .replace(/\s+/g, '')
+    .slice(0, 240);
+}
+function _isRejected(s, lrc) {
+  const h = _lrcHash(lrc);
+  if (!h) return false;
+  const list = s.lrcRejected || [];
+  return list.some(rh => rh && (rh === h || rh.slice(0,120) === h.slice(0,120)));
+}
+
 async function fetchLyricsAuto(s, opts={}) {
   const dur = State.duration || 0;
   const minLines = dur > 60 ? Math.max(10, Math.floor(dur/10)) : 6;
+  // 使用 override 過的歌名/歌手(若有報錯校正)
+  const useTitle = (s.searchTitle && s.searchTitle.trim()) || s.title;
+  const useArtist = (s.searchArtist && s.searchArtist.trim()) || s.artist;
+  const probe = { ...s, title: useTitle, artist: useArtist };
+
+  const accept = (lrc) => lrc && !_isRejected(s, lrc);
 
   // 1) lrclib 精確
-  let r = await lrclibFetch(s.title, s.artist, dur);
-  if (r?.syncedLyrics) return { source:'lrclib', lrc: r.syncedLyrics };
-  let plain = r?.plainLyrics || '';
+  let r = await lrclibFetch(useTitle, useArtist, dur);
+  if (r?.syncedLyrics && accept(r.syncedLyrics)) return { source:'lrclib', lrc: r.syncedLyrics };
+  let plain = (r?.plainLyrics && !_isRejected(s, r.plainLyrics)) ? r.plainLyrics : '';
 
   // 2) lrclib 模糊搜尋
-  r = await lrclibSearchFuzzy(s.title, s.artist, dur);
-  if (r?.syncedLyrics) return { source:'lrclib-search', lrc: r.syncedLyrics };
-  if (r?.plainLyrics) plain = plain || r.plainLyrics;
+  r = await lrclibSearchFuzzy(useTitle, useArtist, dur);
+  if (r?.syncedLyrics && accept(r.syncedLyrics)) return { source:'lrclib-search', lrc: r.syncedLyrics };
+  if (r?.plainLyrics && !_isRejected(s, r.plainLyrics)) plain = plain || r.plainLyrics;
 
-  // 3) 用 AI 把 plain 補時間戳
+  // 3) AI 補時間戳
   if (plain && State.settings.geminiKey) {
     try {
-      const lrc = await aiConvertPlainToLrc(s, plain);
-      if (_countLrcLines(lrc) >= minLines) return { source:'ai-timed', lrc };
+      const lrc = await aiConvertPlainToLrc(probe, plain);
+      if (_countLrcLines(lrc) >= minLines && accept(lrc)) return { source:'ai-timed', lrc };
     } catch(e){ console.warn('aiConvert', e); }
   }
 
   // 4) AI 用 Google Search 直接生成
   if (State.settings.geminiKey) {
     try {
-      const lrc = await aiSearchAndGenerateLrc(s);
-      if (_countLrcLines(lrc) >= minLines) return { source:'ai-search', lrc };
+      const lrc = await aiSearchAndGenerateLrc(probe);
+      if (_countLrcLines(lrc) >= minLines && accept(lrc)) return { source:'ai-search', lrc };
     } catch(e){ console.warn('aiSearch', e); }
   }
 
-  // 5) 最差就用純文字
-  if (plain) return { source:'plain', lrc: plain };
+  // 5) 最差用純文字
+  if (plain && accept(plain)) return { source:'plain', lrc: plain };
   return null;
+}
+
+async function reportLyricsWrong() {
+  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
+  const guessTitle = s.searchTitle || _smartSongName(s.title, s.artist) || s.title;
+  const guessArtist = s.searchArtist || (s.artist || '').replace(/\s*-\s*Topic$/i,'').trim();
+  $('#wrong-title').value = guessTitle;
+  $('#wrong-artist').value = guessArtist;
+  $('#modal-wrong').classList.add('show');
+}
+async function submitWrong() {
+  const s = getCur(); if (!s) return;
+  const t = $('#wrong-title').value.trim();
+  const a = $('#wrong-artist').value.trim();
+  // 把當前歌詞加入拒絕清單
+  if (s.lrc) {
+    const h = _lrcHash(s.lrc);
+    s.lrcRejected = [...new Set([...(s.lrcRejected || []), h])].slice(-10);
+  }
+  if (t) s.searchTitle = t;
+  if (a) s.searchArtist = a;
+  s.lrc = ''; s._lrcTried = false;
+  saveSongsLocal(); parseLyrics('');
+  $('#modal-wrong').classList.remove('show');
+  toast('已標記錯誤,改用「' + (t||'原歌名') + ' / ' + (a||'原歌手') + '」重找…', 4000);
+  try {
+    const r = await fetchLyricsAuto(s);
+    if (!r) {
+      pushSongToCloud(s);
+      toast('找不到符合的新歌詞,可再次報錯或手動 📝 貼');
+      return;
+    }
+    s.lrc = r.lrc; saveSongsLocal(); parseLyrics(r.lrc); pushSongToCloud(s);
+    toast('已換新歌詞 [' + r.source + '] ' + _countLrcLines(r.lrc) + ' 行');
+  } catch(e) { toast('重找失敗: ' + e.message); }
 }
 
 //============== YouTube IFrame ==============
@@ -1966,6 +2045,8 @@ function bind() {
   $('#btn-lrc-fwd').addEventListener('click', () => shiftLrc(0.5));
   $('#btn-lrc-reset').addEventListener('click', resetLrcOffset);
   $('#btn-lrc-calib').addEventListener('click', toggleCalib);
+  $('#btn-lrc-wrong').addEventListener('click', reportLyricsWrong);
+  $('#btn-wrong-submit').addEventListener('click', submitWrong);
   $('#btn-current-pl').addEventListener('click', () => {
     if (!State.currentId) { toast('先選一首歌'); return; }
     openSongSheet(State.currentId);
