@@ -706,41 +706,73 @@ async function gemini(prompt, opts={}) {
 }
 
 //============== lrclib ==============
+function _smartSongName(rawTitle, artist) {
+  let t = String(rawTitle || '').trim();
+  // 1) 去掉 -Topic
+  const cleanArtist = (artist || '').replace(/\s*-\s*Topic$/i,'').trim();
+  // 2) 開頭/結尾的歌手名拿掉
+  if (cleanArtist) {
+    const esc = cleanArtist.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    t = t.replace(new RegExp('^\\s*' + esc + '\\s*[-–—:|]?\\s*','i'),'');
+    t = t.replace(new RegExp('\\s*[-–—:|]?\\s*' + esc + '\\s*$','i'),'');
+  }
+  // 3) 若括號內有內容,取裡面(常見:歌手【歌名】)
+  const m = t.match(/[【\[「『](.+?)[】\]」』]/);
+  if (m) t = m[1];
+  // 4) 去掉常見尾巴雜字
+  t = t.replace(/[\(（\[【「『][^)）\]】」』]*(?:Official|MV|Music\s*Video|Lyric|HD|4K|Live|Audio|Visualizer|歌詞|完整版|Full|Version|高清|官方)[^)）\]】」』]*[\)）\]】」』]/gi,' ');
+  t = t.replace(/\s*[\(（\[【「『]?\s*(Official|Music\s*Video|MV|HD|4K|Live|Audio|Visualizer|Lyrics?|歌詞|完整版|Full|Version|高清|官方版?)\s*[\)）\]】」』]?.*$/gi,'');
+  // 5) 中英混排取中文部分,例「煙花易冷 Fade Away」→「煙花易冷」
+  const cn = t.match(/[一-鿿][一-鿿\s·]*[一-鿿]/);
+  if (cn && cn[0].length >= 2) t = cn[0];
+  return t.replace(/\s+/g,' ').trim();
+}
+
+function _matchesLoosely(a, b) {
+  if (!a || !b) return false;
+  const norm = s => String(s).toLowerCase().replace(/[\s\-_·]/g,'');
+  const x = norm(a), y = norm(b);
+  return x.includes(y) || y.includes(x);
+}
+
 async function lrclibFetch(title, artist, duration) {
+  const songName = _smartSongName(title, artist);
+  const cleanArtist = (artist || '').replace(/\s*-\s*Topic$/i,'').trim();
+  if (!songName || !cleanArtist) return null;
   try {
-    if (artist && title) {
-      const params = new URLSearchParams({ artist_name: artist, track_name: title });
-      if (duration) params.set('duration', String(Math.round(duration)));
-      const r = await fetch('https://lrclib.net/api/get?' + params.toString());
-      if (r.ok) return await r.json();
+    const params = new URLSearchParams({ artist_name: cleanArtist, track_name: songName });
+    if (duration) params.set('duration', String(Math.round(duration)));
+    const r = await fetch('https://lrclib.net/api/get?' + params.toString());
+    if (r.ok) {
+      const data = await r.json();
+      // 驗證:回傳的歌名必須跟我們搜的對得上
+      if (data && (_matchesLoosely(data.name, songName) || _matchesLoosely(data.trackName, songName))) {
+        return data;
+      }
     }
   } catch(e){ console.warn('lrclib get', e); }
   return null;
 }
 
-function _cleanTitleForSearch(t) {
-  return (t || '')
-    .replace(/[\(（\[【].*?[\)）\]】]/g, ' ')
-    .replace(/Official|MV|Music\s*Video|Lyrics|歌詞|HD|4K|Live|Audio|Visualizer|完整版/gi, ' ')
-    .replace(/\s+/g, ' ').trim();
-}
-
 async function lrclibSearchFuzzy(title, artist, duration) {
-  const cleanT = _cleanTitleForSearch(title);
-  const cleanA = (artist || '').replace(/\s*-\s*Topic$/i,'').trim();
+  const songName = _smartSongName(title, artist);
+  const cleanArtist = (artist || '').replace(/\s*-\s*Topic$/i,'').trim();
+  if (!songName) return null;
   const queries = [
-    cleanT && cleanA ? `${cleanT} ${cleanA}` : '',
-    cleanT && cleanA ? `${cleanA} ${cleanT}` : '',
-    cleanT,
-    title,
-  ].filter(Boolean);
+    cleanArtist ? `${songName} ${cleanArtist}` : '',
+    songName,
+    cleanArtist ? `${cleanArtist} ${songName}` : '',
+  ].filter(Boolean).filter((q,i,a) => a.indexOf(q) === i);
+
   for (const q of queries) {
     try {
       const r = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q));
       if (!r.ok) continue;
-      const arr = await r.json();
-      if (!arr || !arr.length) continue;
-      // 依時長相近排序
+      let arr = await r.json();
+      if (!Array.isArray(arr) || !arr.length) continue;
+      // 過濾:歌名要對得上,有時長就再排序
+      arr = arr.filter(x => _matchesLoosely(x.name || x.trackName || '', songName));
+      if (!arr.length) continue;
       if (duration) arr.sort((a,b) => Math.abs((a.duration||0)-duration) - Math.abs((b.duration||0)-duration));
       const hit = arr.find(x => x.syncedLyrics) || arr.find(x => x.plainLyrics) || arr[0];
       if (hit && (hit.syncedLyrics || hit.plainLyrics)) return hit;
@@ -775,24 +807,30 @@ ${plain}`;
 
 async function aiSearchAndGenerateLrc(s) {
   const dur = State.duration || 0;
-  const prompt = `任務:為這首歌提供完整真實的 LRC 同步歌詞。
+  const songName = _smartSongName(s.title, s.artist);
+  const artist = (s.artist || '').replace(/\s*-\s*Topic$/i,'').trim();
+  const prompt = `任務:為這首歌找出真實歌詞並輸出 LRC。
 
-歌曲：${s.title} - ${s.artist || ''}
-${dur ? '長度：' + Math.round(dur) + ' 秒' : ''}
+歌名:${songName}
+歌手:${artist}
+${dur ? '長度:' + Math.round(dur) + ' 秒' : ''}
 
-執行：
-1. 用 Google 搜尋找出完整歌詞（試「${s.title} ${s.artist || ''} 歌詞」「${s.title} lyrics」）
-2. 完整提取所有歌詞段落（主歌、副歌、橋段、重複段都要）
-3. 平均分配 LRC 時間戳到歌曲長度範圍內
-4. 嚴格輸出 LRC,每行 [mm:ss.xx]歌詞,無其他文字
+執行步驟:
+1. 用 Google 搜尋「${songName} ${artist} 歌詞」「${songName} ${artist} lyrics」
+2. 必須驗證搜尋結果是「${songName}」by「${artist}」這首,不是同名或翻唱
+3. 從可信網站(KKBOX、MOJIM、魔鏡歌詞網、Genius)提取完整歌詞
+4. 平均分配 LRC 時間戳到 ${dur ? Math.round(dur)+' 秒內' : '合理長度內'}
 
-絕對不要：
-- markdown 包裹
-- 任何說明、前言、總結
-- 縮減或省略歌詞行
+嚴格規定:
+- 若搜尋結果不確定是這首歌,或找不到完整歌詞 → 只輸出單字 NONE,絕對不要編造
+- 不要從別的同名歌曲挪用歌詞
+- 不要憑想像補完缺失段落
+- 完整輸出純 LRC,每行 [mm:ss.xx]歌詞,無 markdown,無說明、無前言後語
 
-直接輸出 LRC：`;
-  return _cleanLrcOutput(await gemini(prompt, { temp: 0.15, max: 16000, googleSearch: true }));
+開始:`;
+  const out = (await gemini(prompt, { temp: 0.1, max: 16000, googleSearch: true }) || '').trim();
+  if (/^NONE$/i.test(out) || out.toUpperCase().startsWith('NONE')) return '';
+  return _cleanLrcOutput(out);
 }
 
 async function fetchLyricsAuto(s, opts={}) {
@@ -1206,9 +1244,15 @@ async function refetchLyrics() {
   const s = getCur(); if (!s) { toast('先選一首歌'); return; }
   toast('多源抓詞中…(可能需 10-30 秒)', 4000);
   s._lrcTried = false;
+  // 重抓前先清掉舊歌詞,避免找不到時還顯示錯的
+  s.lrc = ''; saveSongsLocal(); parseLyrics('');
   try {
     const r = await fetchLyricsAuto(s);
-    if (!r) { toast('所有來源都找不到,請手動貼歌詞'); return; }
+    if (!r) {
+      pushSongToCloud(s);
+      toast('所有來源都找不到正確歌詞,請手動貼或檢查歌名/歌手');
+      return;
+    }
     s.lrc = r.lrc; saveSongsLocal(); parseLyrics(r.lrc); pushSongToCloud(s);
     toast('歌詞已載入 [' + r.source + '] ✓ ' + _countLrcLines(r.lrc) + ' 行');
   } catch(e) { toast('抓詞失敗：' + e.message); }
