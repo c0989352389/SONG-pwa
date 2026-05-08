@@ -454,15 +454,20 @@ body.mode-lyrics #np-vis{display:none}
 
     <section class="page" id="page-add">
       <div class="search-tabs">
-        <button class="active" data-tab="search">YouTube 搜尋</button>
+        <button class="active" data-tab="recommend">✨ 推薦歌曲</button>
         <button data-tab="url">貼網址</button>
       </div>
-      <div id="tab-search">
-        <input type="text" id="yt-q" placeholder="輸入歌名 / 歌手關鍵字">
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn pri" id="btn-yt-search" style="flex:1">搜尋 YouTube</button>
+      <div id="tab-recommend">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
+          AI 分析你最常聽的歌風格,推薦相似新歌。可在下方加註想要的風格。
         </div>
-        <div class="results" id="yt-results"></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="text" id="rec-seed" placeholder="額外風格(選填) 例:日語抒情、搖滾、80年代" style="flex:1">
+          <button class="btn pri" id="btn-load-rec">取得推薦</button>
+        </div>
+        <div class="results" id="rec-results">
+          <div class="empty"><div class="empty-i">✨</div><div class="empty-t">按上方「取得推薦」依你的歌單口味推薦新歌</div></div>
+        </div>
       </div>
       <div id="tab-url" style="display:none">
         <label>YouTube 網址或影片 ID</label>
@@ -1565,6 +1570,93 @@ async function addSong(s) {
   }
   return local;
 }
+async function aiRecommend(seed, count=12) {
+  if (!State.settings.geminiKey) throw new Error('需要 Gemini API Key');
+  const lib = State.songs
+    .sort((a,b) => (b.playCount||0) - (a.playCount||0))
+    .slice(0, 40)
+    .map(s => `- ${s.title} / ${s.artist || '?'}${s.playCount ? ' (聽 '+s.playCount+' 次)' : ''}`)
+    .join('\n');
+  const existing = State.songs.map(s => (s.title||'') + ' ' + (s.artist||'')).join(' | ');
+  const prompt = `你是音樂推薦師。根據使用者的歌單分析他的口味(風格、年代、語言、情緒),推薦 ${count} 首他**還沒聽過**但會喜歡的歌。
+
+使用者歌單(依播放次數排序):
+${lib || '(尚無歌曲)'}
+${seed ? '\n使用者額外要求風格: ' + seed : ''}
+
+要求:
+1. 必須是真實存在、能在 YouTube 找到的歌
+2. 不要重複使用者已有的歌(已有清單: ${existing.slice(0,500)})
+3. 多樣性:不要全是同一個歌手,但可以有 1-2 首相同歌手的不同歌
+4. 推薦理由要短(15 字內)、具體(說出風格特點)
+5. 嚴格輸出 JSON 陣列,無 markdown,無前後文字:
+[{"title":"歌名","artist":"歌手","reason":"推薦理由"}, ...]`;
+  let txt = await gemini(prompt, { temp: 0.8, max: 4000 });
+  txt = txt.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
+  // 找出 JSON 陣列範圍
+  const start = txt.indexOf('[');
+  const end = txt.lastIndexOf(']');
+  if (start < 0 || end < 0) throw new Error('AI 回傳格式不對');
+  return JSON.parse(txt.slice(start, end + 1));
+}
+
+async function loadRecommendations(seed) {
+  const list = $('#rec-results');
+  if (!State.songs.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-i">♫</div><div class="empty-t">先加幾首歌,我才能依你的喜好推薦</div></div>';
+    return;
+  }
+  if (!State.settings.geminiKey) {
+    list.innerHTML = '<div class="empty"><div class="empty-t">需要 Gemini API Key,到 ⚙ 設定</div></div>';
+    return;
+  }
+  if (!State.settings.ytKey) {
+    list.innerHTML = '<div class="empty"><div class="empty-t">需要 YouTube API Key,到 ⚙ 設定</div></div>';
+    return;
+  }
+  list.innerHTML = '<div class="empty"><div class="empty-t"><span class="spinner"></span> AI 分析你的歌單口味中…</div></div>';
+  let recs;
+  try { recs = await aiRecommend(seed); }
+  catch(e) { list.innerHTML = '<div class="empty"><div class="empty-t">AI 推薦失敗: ' + escapeHtml(e.message) + '</div></div>'; return; }
+  if (!Array.isArray(recs) || !recs.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-t">沒推薦出結果</div></div>';
+    return;
+  }
+  list.innerHTML = '<div class="empty"><div class="empty-t"><span class="spinner"></span> 在 YouTube 找這些歌…</div></div>';
+  const existingVids = new Set(State.songs.map(s => s.videoId));
+  const cards = await Promise.all(recs.slice(0, 12).map(async r => {
+    try {
+      const items = await searchYouTube(`${r.title} ${r.artist}`);
+      const top = items.find(it => !existingVids.has(it.videoId)) || items[0];
+      return { rec: r, found: top };
+    } catch(_) { return { rec: r, found: null }; }
+  }));
+  const valid = cards.filter(c => c.found);
+  if (!valid.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-t">YouTube 搜尋失敗,稍後再試</div></div>';
+    return;
+  }
+  list.innerHTML = valid.map(c => {
+    const f = c.found, r = c.rec;
+    return `<div class="result-row">
+      <img src="${f.thumb}" alt="">
+      <div class="song-info">
+        <div class="song-title">${escapeHtml(r.title || f.title)}</div>
+        <div class="song-meta">
+          ${escapeHtml(r.artist || f.artist)}
+          ${r.reason ? `<span class="song-tag">${escapeHtml(r.reason)}</span>` : ''}
+        </div>
+      </div>
+      <button class="btn pri" data-vid="${f.videoId}" data-title="${escapeHtml(r.title || f.title)}" data-artist="${escapeHtml(r.artist || f.artist)}" data-thumb="${f.thumb}">＋</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('button[data-vid]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true; b.textContent = '…';
+    await addSong({ videoId: b.dataset.vid, title: b.dataset.title, artist: b.dataset.artist, thumb: b.dataset.thumb });
+    b.textContent = '✓';
+  }));
+}
+
 async function addByUrl() {
   const raw = $('#url-input').value.trim();
   const id = ytIdFromUrl(raw); if (!id) { toast('網址或 ID 無效'); return; }
@@ -1758,28 +1850,11 @@ function bind() {
 
   $$('.search-tabs button').forEach(b => b.addEventListener('click', () => {
     $$('.search-tabs button').forEach(x => x.classList.toggle('active', x === b));
-    $('#tab-search').style.display = b.dataset.tab === 'search' ? '' : 'none';
+    $('#tab-recommend').style.display = b.dataset.tab === 'recommend' ? '' : 'none';
     $('#tab-url').style.display = b.dataset.tab === 'url' ? '' : 'none';
   }));
-  $('#btn-yt-search').addEventListener('click', async () => {
-    const q = $('#yt-q').value.trim(); if (!q) return;
-    $('#yt-results').innerHTML = '<div class="empty"><div class="empty-t">搜尋中…</div></div>';
-    const items = await searchYouTube(q);
-    if (!items.length) { $('#yt-results').innerHTML = '<div class="empty"><div class="empty-t">沒結果</div></div>'; return; }
-    $('#yt-results').innerHTML = items.map(it => `
-      <div class="result-row">
-        <img src="${it.thumb}" alt="">
-        <div class="song-info">
-          <div class="song-title">${escapeHtml(it.title)}</div>
-          <div class="song-meta">${escapeHtml(it.artist)}</div>
-        </div>
-        <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}">＋</button>
-      </div>`).join('');
-    $('#yt-results').querySelectorAll('button[data-vid]').forEach(b => b.addEventListener('click', () => {
-      addSong({ videoId: b.dataset.vid, title: b.dataset.title, artist: b.dataset.artist, thumb: b.dataset.thumb });
-    }));
-  });
-  $('#yt-q').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-yt-search').click(); });
+  $('#btn-load-rec').addEventListener('click', () => loadRecommendations($('#rec-seed').value.trim()));
+  $('#rec-seed').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-load-rec').click(); });
   $('#btn-add-url').addEventListener('click', addByUrl);
 
   $('#btn-settings').addEventListener('click', () => {
