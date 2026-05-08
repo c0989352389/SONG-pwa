@@ -15,31 +15,37 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0a0420; --bg2:#160a3a; --accent:#a96bff; --accent2:#00f0ff; --hot:#ff4fb0;
+  --bg:#0a0420; --bg2:#160a3a;
+  --accent:#a96bff; --accent2:#00f0ff; --hot:#ff4fb0;
   --text:#f0e8ff; --text2:#a89dc8; --text3:rgba(168,157,200,.4);
   --glass:rgba(255,255,255,.06); --glass-br:rgba(255,255,255,.14); --glass-st:rgba(255,255,255,.18);
   --r:18px; --nav-h:68px;
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
 }
+.theme-fire{--accent:#ff6b3d;--accent2:#ffd03d;--hot:#ff3d6b}
+.theme-ocean{--accent:#3dc6ff;--accent2:#6bffd0;--hot:#3d6bff}
+.theme-forest{--accent:#6bff9c;--accent2:#d0ff3d;--hot:#3dffc6}
+.theme-sunset{--accent:#ff6bb8;--accent2:#ffb86b;--hot:#b86bff}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%;overflow:hidden;-webkit-text-size-adjust:100%}
 body{height:100%;color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:15px;overflow:hidden;-webkit-font-smoothing:antialiased;
   background:
-    radial-gradient(circle at 15% 10%, #ff4fb022 0%, transparent 40%),
-    radial-gradient(circle at 85% 80%, #00f0ff22 0%, transparent 45%),
-    radial-gradient(circle at 60% 40%, #a96bff33 0%, transparent 50%),
+    radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--hot) 18%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, color-mix(in srgb, var(--accent2) 18%, transparent) 0%, transparent 45%),
+    radial-gradient(circle at 60% 40%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 50%),
     linear-gradient(180deg,#0a0420 0%,#160a3a 100%);
   background-attachment:fixed;
+  transition:background 1.4s ease;
 }
 #app{display:flex;flex-direction:column;height:100%;height:100dvh}
 
-/* Header */
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 10px;padding-top:calc(12px + var(--safe-t));flex-shrink:0;
   background:rgba(10,4,32,.55);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--glass-br);position:relative;z-index:5}
 .hl{display:flex;align-items:center;gap:10px}
-.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#a96bff,#00f0ff);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;box-shadow:0 4px 14px rgba(169,107,255,.4)}
-.appname{font-size:18px;font-weight:700;letter-spacing:1px;background:linear-gradient(90deg,#a96bff,#00f0ff,#ff4fb0);-webkit-background-clip:text;background-clip:text;color:transparent}
-.gb{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glass-br);border-radius:50%;color:var(--text);font-size:15px;cursor:pointer;backdrop-filter:blur(10px)}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;box-shadow:0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);transition:background 1.4s, box-shadow 1.4s}
+.appname{font-size:18px;font-weight:700;letter-spacing:1px;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent;transition:background 1.4s}
+.gb{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glass-br);border-radius:50%;color:var(--text);font-size:15px;cursor:pointer;backdrop-filter:blur(10px);transition:all .15s}
+.gb:hover{background:rgba(255,255,255,.12)}
 
 main{flex:1;overflow:hidden;position:relative}
 .page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:14px 14px calc(var(--nav-h) + var(--safe-b) + 16px);opacity:0;transform:translateX(18px);transition:opacity .2s,transform .2s;pointer-events:none;scrollbar-width:thin;scrollbar-color:var(--glass-br) transparent}
@@ -47,80 +53,95 @@ main{flex:1;overflow:hidden;position:relative}
 .page::-webkit-scrollbar{width:6px}
 .page::-webkit-scrollbar-thumb{background:var(--glass-br);border-radius:3px}
 
-/* Nav */
 nav{display:flex;background:rgba(10,4,32,.65);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--glass-br);padding-bottom:var(--safe-b);flex-shrink:0;position:relative;z-index:5}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:11px 0 9px;background:none;border:none;color:var(--text3);font-family:inherit;font-size:11px;cursor:pointer;transition:color .15s}
 .nb .ni{font-size:21px;line-height:1;transition:transform .15s}
 .nb.active{color:var(--accent)}.nb.active .ni{transform:translateY(-2px)}
 
-/* Glass card */
 .gc{background:var(--glass);border:1px solid var(--glass-br);border-radius:var(--r);padding:16px;margin-bottom:12px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 8px 32px rgba(0,0,0,.25)}
-.gc-t{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:500}
+.gc-t{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:500;display:flex;justify-content:space-between;align-items:center}
 
-/* Buttons */
 .btn{background:var(--glass);border:1px solid var(--glass-br);border-radius:12px;color:var(--text);font-family:inherit;font-size:14px;padding:10px 16px;cursor:pointer;backdrop-filter:blur(10px);transition:all .15s}
 .btn:hover{background:rgba(255,255,255,.1);border-color:var(--glass-st)}
-.btn.pri{background:linear-gradient(135deg,#a96bff,#00f0ff);border:none;color:#fff;font-weight:600;box-shadow:0 6px 20px rgba(169,107,255,.35)}
-.btn.pri:hover{box-shadow:0 8px 28px rgba(169,107,255,.5)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.pri{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-weight:600;box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 35%, transparent)}
+.btn.pri:hover{box-shadow:0 8px 28px color-mix(in srgb, var(--accent) 50%, transparent)}
 .btn.dim{color:var(--text2)}
 .btn.danger{color:#ff6b9c;border-color:rgba(255,107,156,.3)}
+.btn.sm{padding:6px 11px;font-size:12px;border-radius:8px}
 
-/* Inputs */
-input,textarea{font-family:inherit;font-size:14px;background:rgba(0,0,0,.25);border:1px solid var(--glass-br);border-radius:10px;color:var(--text);padding:10px 12px;width:100%;outline:none;transition:border-color .15s}
-input:focus,textarea:focus{border-color:var(--accent)}
+input,textarea,select{font-family:inherit;font-size:14px;background:rgba(0,0,0,.25);border:1px solid var(--glass-br);border-radius:10px;color:var(--text);padding:10px 12px;width:100%;outline:none;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 input::placeholder,textarea::placeholder{color:var(--text3)}
 textarea{resize:vertical;min-height:120px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6}
 label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-spacing:.5px}
 
-/* Now Playing page */
+/* Now Playing */
 .np-stage{padding:8px 4px 4px}
 .np-art{position:relative;width:100%;aspect-ratio:1/1;max-width:340px;margin:0 auto 18px;border-radius:24px;overflow:hidden;background:var(--glass);border:1px solid var(--glass-br);box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .np-art img{width:100%;height:100%;object-fit:cover;filter:saturate(1.1)}
 .np-art.empty{display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:48px}
 .np-art.playing::after{content:'';position:absolute;inset:0;border:2px solid var(--accent);border-radius:24px;animation:pulse 2s infinite;pointer-events:none}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(169,107,255,.5)}50%{box-shadow:0 0 0 14px rgba(169,107,255,0)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent)}50%{box-shadow:0 0 0 14px transparent}}
 .np-title{font-size:20px;font-weight:600;text-align:center;margin-bottom:4px;line-height:1.3;padding:0 8px;word-break:break-word}
 .np-artist{font-size:13px;color:var(--text2);text-align:center;margin-bottom:18px}
-
 .np-prog{padding:0 6px;margin-bottom:14px}
-.np-bar{height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;cursor:pointer;position:relative}
-.np-fill{height:100%;background:linear-gradient(90deg,#a96bff,#00f0ff);border-radius:2px;width:0%;transition:width .25s linear}
+.np-bar{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;cursor:pointer;position:relative}
+.np-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;width:0%;transition:width .25s linear}
+.np-bar .ab-marker{position:absolute;top:-4px;width:3px;height:14px;border-radius:2px;pointer-events:none}
+.np-bar .ab-marker.a{background:var(--accent2)}
+.np-bar .ab-marker.b{background:var(--hot)}
 .np-times{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);margin-top:6px}
-
-.np-ctrl{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:14px}
-.np-ctrl button{background:var(--glass);border:1px solid var(--glass-br);border-radius:50%;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);transition:all .15s}
+.np-ctrl{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.np-ctrl button{background:var(--glass);border:1px solid var(--glass-br);border-radius:50%;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);transition:all .15s;font-family:inherit}
 .np-ctrl button:hover{background:rgba(255,255,255,.12)}
-.np-ctrl .small{width:42px;height:42px;font-size:16px}
-.np-ctrl .play{width:64px;height:64px;font-size:24px;background:linear-gradient(135deg,#a96bff,#00f0ff);border:none;color:#fff;box-shadow:0 8px 24px rgba(169,107,255,.45)}
+.np-ctrl .small{width:42px;height:42px;font-size:14px;font-weight:600}
+.np-ctrl .play{width:64px;height:64px;font-size:24px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;box-shadow:0 8px 24px color-mix(in srgb, var(--accent) 45%, transparent)}
 .np-ctrl .voice{width:48px;height:48px;font-size:18px}
 .np-ctrl .voice.rec{background:var(--hot);border-color:var(--hot);color:#fff;animation:pulse 1.4s infinite}
+.np-ctrl .on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* AB row */
+.ab-row{display:flex;justify-content:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.ab-pill{font-size:11px;background:var(--glass);border:1px solid var(--glass-br);border-radius:14px;padding:5px 10px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .15s}
+.ab-pill.set{color:var(--text);border-color:var(--accent)}
+.ab-pill.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ab-pill.danger{color:#ff6b9c;border-color:rgba(255,107,156,.3)}
 
 /* Lyrics */
-.lyr-box{margin-top:14px;max-height:48vh;overflow-y:auto;padding:12px 4px;text-align:center;mask-image:linear-gradient(180deg,transparent 0%,#000 12%,#000 88%,transparent 100%);-webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 12%,#000 88%,transparent 100%)}
+.lyr-tools{display:flex;gap:6px;flex-wrap:wrap}
+.lyr-box{margin-top:8px;max-height:48vh;overflow-y:auto;padding:8px 4px;text-align:center;mask-image:linear-gradient(180deg,transparent 0%,#000 12%,#000 88%,transparent 100%);-webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 12%,#000 88%,transparent 100%)}
 .lyr-box::-webkit-scrollbar{width:0}
-.lyr-line{padding:8px 4px;font-size:15px;color:var(--text3);transition:all .25s;cursor:pointer;line-height:1.5}
-.lyr-line.active{font-size:18px;font-weight:600;color:var(--text);text-shadow:0 0 18px rgba(169,107,255,.6)}
+.lyr-line{padding:7px 4px;font-size:15px;color:var(--text3);transition:all .25s;cursor:pointer;line-height:1.5;position:relative}
+.lyr-line.active{font-size:18px;font-weight:600;color:var(--text);text-shadow:0 0 18px color-mix(in srgb, var(--accent) 60%, transparent)}
 .lyr-line:hover{color:var(--text2)}
+.lyr-tr{font-size:13px;color:var(--accent2);margin-top:3px;font-weight:400}
+.lyr-ex{font-size:12px;color:var(--text3);margin-top:2px;font-style:italic}
 .lyr-empty{color:var(--text3);font-size:13px;text-align:center;padding:30px 20px}
 
 /* Library */
-.lib-search{position:sticky;top:0;z-index:2;padding-bottom:10px;background:linear-gradient(180deg,rgba(10,4,32,.85) 0%,rgba(10,4,32,.55) 80%,transparent 100%);backdrop-filter:blur(12px);margin:-14px -14px 8px;padding:14px}
+.lib-search{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,rgba(10,4,32,.92) 0%,rgba(10,4,32,.7) 80%,transparent 100%);backdrop-filter:blur(12px);margin:-14px -14px 8px;padding:14px 14px 8px}
+.pl-tabs{display:flex;gap:6px;overflow-x:auto;padding:0 0 8px;scrollbar-width:none}
+.pl-tabs::-webkit-scrollbar{display:none}
+.pl-tab{flex-shrink:0;background:var(--glass);border:1px solid var(--glass-br);border-radius:18px;padding:6px 14px;color:var(--text2);font-family:inherit;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.pl-tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-weight:600}
+.pl-tab.add{color:var(--accent);border-style:dashed}
 .song-row{display:flex;align-items:center;gap:11px;padding:9px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-br);margin-bottom:7px;cursor:pointer;transition:all .15s;backdrop-filter:blur(10px)}
 .song-row:hover{background:rgba(255,255,255,.09);border-color:var(--glass-st)}
-.song-row.playing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(169,107,255,.25)}
+.song-row.playing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px color-mix(in srgb, var(--accent) 25%, transparent)}
 .song-row img{width:50px;height:50px;border-radius:8px;object-fit:cover;flex-shrink:0;background:rgba(0,0,0,.3)}
 .song-info{flex:1;min-width:0}
 .song-title{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .song-meta{font-size:11px;color:var(--text3);margin-top:2px;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.song-tag{background:rgba(169,107,255,.18);color:var(--accent);border-radius:4px;padding:1px 5px;font-size:10px}
+.song-tag{background:color-mix(in srgb, var(--accent) 20%, transparent);color:var(--accent);border-radius:4px;padding:1px 5px;font-size:10px}
 .song-act{display:flex;gap:4px;flex-shrink:0}
 .song-act button{background:transparent;border:none;color:var(--text2);font-size:14px;width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .song-act button:hover{background:rgba(255,255,255,.08);color:var(--text)}
 
-/* Add page — search results */
+/* Add page */
 .search-tabs{display:flex;gap:8px;margin-bottom:12px}
 .search-tabs button{flex:1;background:var(--glass);border:1px solid var(--glass-br);border-radius:10px;color:var(--text2);padding:9px;cursor:pointer;font-family:inherit;font-size:13px;transition:all .15s}
-.search-tabs button.active{background:linear-gradient(135deg,rgba(169,107,255,.35),rgba(0,240,255,.35));border-color:var(--accent);color:var(--text)}
+.search-tabs button.active{background:linear-gradient(135deg,color-mix(in srgb, var(--accent) 35%, transparent),color-mix(in srgb, var(--accent2) 35%, transparent));border-color:var(--accent);color:var(--text)}
 .results{margin-top:12px}
 .result-row{display:flex;gap:11px;padding:9px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-br);margin-bottom:7px;align-items:center;backdrop-filter:blur(10px)}
 .result-row img{width:80px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0}
@@ -132,30 +153,59 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
 /* Modal */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
 .modal.show{display:flex}
-.modal-card{background:linear-gradient(180deg,rgba(35,18,80,.95),rgba(15,6,40,.95));border:1px solid var(--glass-st);border-radius:20px;padding:20px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;backdrop-filter:blur(20px)}
+.modal-card{background:linear-gradient(180deg,rgba(35,18,80,.95),rgba(15,6,40,.95));border:1px solid var(--glass-st);border-radius:20px;padding:20px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;backdrop-filter:blur(20px)}
 .modal-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .modal-h h3{font-size:16px;font-weight:600}
 .modal-row{margin-bottom:12px}
-.modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 
-/* Voice indicator */
-.voice-overlay{position:fixed;inset:0;background:radial-gradient(circle at center, rgba(169,107,255,.25), rgba(10,4,32,.92));display:none;align-items:center;justify-content:center;flex-direction:column;z-index:80;backdrop-filter:blur(8px)}
+/* Voice */
+.voice-overlay{position:fixed;inset:0;background:radial-gradient(circle at center, color-mix(in srgb, var(--accent) 25%, transparent), rgba(10,4,32,.92));display:none;align-items:center;justify-content:center;flex-direction:column;z-index:80;backdrop-filter:blur(8px)}
 .voice-overlay.show{display:flex}
-.voice-circle{width:140px;height:140px;border-radius:50%;background:linear-gradient(135deg,#a96bff,#00f0ff);display:flex;align-items:center;justify-content:center;font-size:48px;color:#fff;box-shadow:0 0 60px rgba(169,107,255,.7);animation:pulse 1.4s infinite}
-.voice-text{margin-top:24px;font-size:16px;color:var(--text);min-height:24px}
-.voice-hint{margin-top:8px;font-size:12px;color:var(--text2)}
+.voice-circle{width:140px;height:140px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:48px;color:#fff;box-shadow:0 0 60px color-mix(in srgb, var(--accent) 70%, transparent);animation:pulse 1.4s infinite}
+.voice-text{margin-top:24px;font-size:16px;color:var(--text);min-height:24px;text-align:center;padding:0 24px}
+.voice-hint{margin-top:8px;font-size:12px;color:var(--text2);text-align:center;padding:0 24px}
 
-#yt-host{position:fixed;bottom:-200px;left:0;width:1px;height:1px;pointer-events:none;opacity:0}
-
-/* iframe player visible in player page */
 .np-player-vis{position:relative;width:100%;aspect-ratio:16/9;max-width:340px;margin:0 auto 18px;border-radius:24px;overflow:hidden;background:#000;border:1px solid var(--glass-br);box-shadow:0 20px 60px rgba(0,0,0,.5);display:none}
 .np-player-vis.on{display:block}
 .np-player-vis iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 
-/* Empty state */
 .empty{text-align:center;padding:60px 20px;color:var(--text3)}
 .empty-i{font-size:56px;margin-bottom:12px;opacity:.5}
 .empty-t{font-size:14px;margin-bottom:18px}
+
+/* Section editor */
+.sec-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto}
+.sec-row{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.2);padding:8px;border-radius:10px;border:1px solid var(--glass-br)}
+.sec-row .sec-time{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);min-width:48px;cursor:pointer}
+.sec-row .sec-time:hover{color:var(--accent)}
+.sec-row select{padding:6px 8px;font-size:12px;width:auto;flex:1}
+.sec-row input[type="text"]{padding:6px 8px;font-size:12px;flex:2}
+.sec-row .x{background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px 8px}
+.theme-chip{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid var(--glass-br);margin-right:4px;vertical-align:middle}
+.tc-default{background:linear-gradient(135deg,#a96bff,#00f0ff)}
+.tc-fire{background:linear-gradient(135deg,#ff6b3d,#ffd03d)}
+.tc-ocean{background:linear-gradient(135deg,#3dc6ff,#6bffd0)}
+.tc-forest{background:linear-gradient(135deg,#6bff9c,#d0ff3d)}
+.tc-sunset{background:linear-gradient(135deg,#ff6bb8,#ffb86b)}
+
+/* Speed dropdown */
+.speed-menu{position:absolute;background:rgba(20,8,50,.95);border:1px solid var(--glass-st);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:2px;z-index:30;backdrop-filter:blur(14px)}
+.speed-menu button{background:transparent;border:none;color:var(--text);padding:7px 14px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:13px;text-align:left}
+.speed-menu button:hover{background:rgba(255,255,255,.1)}
+.speed-menu button.active{background:var(--accent);color:#fff}
+
+.spinner{width:16px;height:16px;border:2px solid var(--text3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.sheet{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(35,18,80,.98),rgba(15,6,40,.98));border-top:1px solid var(--glass-st);border-radius:18px 18px 0 0;padding:14px 14px calc(14px + var(--safe-b));z-index:60;transform:translateY(100%);transition:transform .25s;backdrop-filter:blur(20px);max-height:85vh;overflow-y:auto}
+.sheet.show{transform:translateY(0)}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.sheet-h h3{font-size:15px;font-weight:600}
+
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--glass);border:1px solid var(--glass-br);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--text2);margin:3px;cursor:pointer;transition:all .15s}
+.chip:hover{background:rgba(255,255,255,.1)}
+.chip.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-weight:600}
 </style>
 </head>
 <body>
@@ -169,17 +219,18 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
   </header>
 
   <main>
-    <!-- Now Playing -->
     <section class="page active" id="page-player">
       <div class="np-stage">
         <div class="np-player-vis" id="np-vis"><div id="yt-iframe-mount"></div></div>
         <div class="np-art empty" id="np-art"><span id="np-art-icon">♪</span></div>
         <div class="np-title" id="np-title">尚未選曲</div>
         <div class="np-artist" id="np-artist">點下方收藏選一首，或到「加歌」搜尋</div>
+
         <div class="np-prog">
           <div class="np-bar" id="np-bar"><div class="np-fill" id="np-fill"></div></div>
           <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
         </div>
+
         <div class="np-ctrl">
           <button class="small" id="btn-prev" title="上一首">⏮</button>
           <button class="small" id="btn-back10" title="後退10秒">«10</button>
@@ -187,31 +238,47 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
           <button class="small" id="btn-fwd10" title="前進10秒">10»</button>
           <button class="small" id="btn-next" title="下一首">⏭</button>
         </div>
-        <div class="np-ctrl" style="margin-bottom:10px">
-          <button class="voice" id="btn-voice" title="語音控制">🎙</button>
-          <button class="small" id="btn-toggle-vid" title="顯示/隱藏影片">📺</button>
+
+        <div class="np-ctrl" style="margin-bottom:8px">
+          <button class="voice" id="btn-voice" title="語音">🎙</button>
+          <button class="small" id="btn-toggle-vid" title="影片">📺</button>
           <button class="small" id="btn-edit-lrc" title="編輯歌詞">📝</button>
           <button class="small" id="btn-shuffle" title="隨機">🔀</button>
+          <button class="small" id="btn-speed" title="倍速" style="font-size:12px">1×</button>
+          <button class="small" id="btn-sections" title="段落主題">🌊</button>
+        </div>
+
+        <div class="ab-row">
+          <button class="ab-pill" id="btn-ab-a">A: --:--</button>
+          <button class="ab-pill" id="btn-ab-b">B: --:--</button>
+          <button class="ab-pill" id="btn-ab-loop">🔁 循環</button>
+          <button class="ab-pill danger" id="btn-ab-clear">清除</button>
         </div>
 
         <div class="gc">
-          <div class="gc-t">歌詞・互動學習</div>
+          <div class="gc-t">
+            <span>歌詞・互動學習</span>
+            <span class="lyr-tools">
+              <button class="btn sm" id="btn-fetch-lrc" title="從 lrclib 抓">🌐 抓詞</button>
+              <button class="btn sm" id="btn-ai-lrc" title="AI 生成">✨ AI</button>
+              <button class="btn sm" id="btn-translate-all" title="逐句翻譯">🌏 翻譯</button>
+            </span>
+          </div>
           <div class="lyr-box" id="lyr-box">
-            <div class="lyr-empty">尚無歌詞，點 📝 貼 LRC 或純文字</div>
+            <div class="lyr-empty">尚無歌詞，點 📝 貼 LRC、🌐 自動抓、或 ✨ AI 生成</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Library -->
     <section class="page" id="page-library">
       <div class="lib-search">
         <input type="text" id="lib-q" placeholder="🔍 搜尋我的歌單（歌名 / 歌手 / 標籤）">
+        <div class="pl-tabs" id="pl-tabs"></div>
       </div>
       <div id="lib-list"></div>
     </section>
 
-    <!-- Add -->
     <section class="page" id="page-add">
       <div class="search-tabs">
         <button class="active" data-tab="search">YouTube 搜尋</button>
@@ -244,26 +311,27 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
 
   <div class="toast" id="toast"></div>
 
-  <!-- Settings Modal -->
+  <!-- Settings -->
   <div class="modal" id="modal-settings">
     <div class="modal-card">
-      <div class="modal-h">
-        <h3>⚙ 設定</h3>
-        <button class="gb" data-close>✕</button>
+      <div class="modal-h"><h3>⚙ 設定</h3><button class="gb" data-close>✕</button></div>
+      <div class="modal-row">
+        <label>YouTube Data API Key（搜尋必須）</label>
+        <input type="text" id="set-yt-key" placeholder="AIzaSy...">
       </div>
       <div class="modal-row">
-        <label>YouTube Data API Key（搜尋功能必須）</label>
-        <input type="text" id="set-yt-key" placeholder="AIzaSy...">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">免費於 Google Cloud Console 申請。沒填也能用「貼網址」加歌。</div>
+        <label>Gemini API Key（AI 歌詞 / 翻譯 / 解釋）</label>
+        <input type="text" id="set-gemini-key" placeholder="AIzaSy...">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">免費於 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent2)">Google AI Studio</a> 申請</div>
       </div>
       <div class="modal-row">
         <label>GAS Web App URL（雲端同步歌單，選填）</label>
         <input type="text" id="set-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">空白時改用本機 localStorage 儲存。</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">空白時改用本機 localStorage 儲存</div>
       </div>
       <div class="modal-row">
         <label>語音識別語言</label>
-        <select id="set-lang" style="width:100%;background:rgba(0,0,0,.25);border:1px solid var(--glass-br);border-radius:10px;color:var(--text);padding:10px;font-family:inherit">
+        <select id="set-lang">
           <option value="zh-TW">中文（台灣）</option>
           <option value="zh-CN">中文（大陸）</option>
           <option value="en-US">English (US)</option>
@@ -271,21 +339,19 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
         </select>
       </div>
       <div class="modal-foot">
+        <button class="btn dim" id="btn-resync">手動同步雲端</button>
         <button class="btn dim" data-close>取消</button>
         <button class="btn pri" id="btn-save-settings">儲存</button>
       </div>
     </div>
   </div>
 
-  <!-- Lyrics Modal -->
+  <!-- LRC editor -->
   <div class="modal" id="modal-lrc">
     <div class="modal-card">
-      <div class="modal-h">
-        <h3>📝 編輯歌詞</h3>
-        <button class="gb" data-close>✕</button>
-      </div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">支援 LRC 時間軸格式 <code>[mm:ss.xx]歌詞</code>，或純文字（無時間軸自動展示）</div>
-      <textarea id="lrc-input" placeholder="[00:12.50]第一句歌詞&#10;[00:18.00]第二句歌詞&#10;..."></textarea>
+      <div class="modal-h"><h3>📝 編輯歌詞</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">支援 LRC 時間軸格式 <code>[mm:ss.xx]歌詞</code>，或純文字</div>
+      <textarea id="lrc-input" placeholder="[00:12.50]第一句歌詞&#10;[00:18.00]第二句歌詞"></textarea>
       <div class="modal-foot">
         <button class="btn dim" data-close>取消</button>
         <button class="btn pri" id="btn-save-lrc">儲存歌詞</button>
@@ -293,88 +359,127 @@ label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-s
     </div>
   </div>
 
+  <!-- Sections editor -->
+  <div class="modal" id="modal-sections">
+    <div class="modal-card">
+      <div class="modal-h"><h3>🌊 段落主題（隨段落切換配色）</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">在副歌、橋段等想換風格的時間點按「+ 標目前」加段落，每段挑一個主題色</div>
+      <div class="sec-list" id="sec-list"></div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn sm" id="btn-sec-add-now">+ 標目前時間</button>
+        <button class="btn sm dim" id="btn-sec-add-zero">+ 從 0:00 加</button>
+      </div>
+      <div class="modal-foot">
+        <button class="btn dim" data-close>關閉</button>
+        <button class="btn pri" id="btn-save-sec">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Playlists manager -->
+  <div class="modal" id="modal-pl">
+    <div class="modal-card">
+      <div class="modal-h"><h3>♫ 管理歌單分組</h3><button class="gb" data-close>✕</button></div>
+      <div id="pl-mgr"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input type="text" id="pl-new-name" placeholder="新歌單名稱" style="flex:1">
+        <button class="btn pri" id="btn-pl-create">建立</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Song detail sheet -->
+  <div class="sheet" id="sheet-song">
+    <div class="sheet-h"><h3 id="sheet-title">操作</h3><button class="gb" data-close-sheet>✕</button></div>
+    <div id="sheet-body"></div>
+  </div>
+
+  <!-- Speed menu -->
+  <div class="speed-menu" id="speed-menu" style="display:none"></div>
+
   <!-- Voice overlay -->
   <div class="voice-overlay" id="voice-overlay">
     <div class="voice-circle">🎙</div>
     <div class="voice-text" id="voice-text">聽你說…</div>
-    <div class="voice-hint">「播放周杰倫」「下一首」「暫停」「隨機播放」</div>
+    <div class="voice-hint">「播放周杰倫」「下一首」「暫停」「隨機播放」「快一點」「翻譯歌詞」</div>
     <button class="btn" id="btn-voice-cancel" style="margin-top:30px">取消</button>
   </div>
-
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-//============================================================
-// SONG PWA — main app
-//============================================================
 'use strict';
 
 const LS = {
-  songs:'song.songs', settings:'song.settings', current:'song.current'
+  songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl'
 };
-const DEFAULT_SETTINGS = { ytKey:'', gasUrl:'', lang:'zh-TW' };
+const DEFAULT_SETTINGS = { ytKey:'', geminiKey:'', gasUrl:'', lang:'zh-TW' };
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const THEMES = ['default','fire','ocean','forest','sunset'];
+const THEME_LABELS = { default:'紫青(預設)', fire:'烈焰', ocean:'海洋', forest:'森林', sunset:'夕陽' };
 
 const State = {
-  songs: [],
+  songs: [], playlists: [], currentPlaylistId: 'all',
   settings: { ...DEFAULT_SETTINGS },
-  player: null,
-  ready: false,
-  currentId: null,
-  isPlaying: false,
-  duration: 0,
-  progressTimer: null,
-  lyrics: [],
-  activeLyricIdx: -1,
-  recognition: null,
-  recognizing: false,
-  videoVisible: false,
+  player: null, ready: false,
+  currentId: null, isPlaying: false, duration: 0,
+  progressTimer: null, lyrics: [], activeLyricIdx: -1,
+  recognition: null, recognizing: false, videoVisible: false,
+  ab: { a: null, b: null, on: false },
+  speed: 1, currentTheme: 'default',
 };
 
-//-------------- helpers --------------
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const fmt = sec => {
   if (!sec || isNaN(sec)) return '0:00';
-  sec = Math.floor(sec);
-  const m = Math.floor(sec/60), s = sec%60;
+  sec = Math.floor(sec); const m = Math.floor(sec/60), s = sec%60;
   return m + ':' + String(s).padStart(2,'0');
 };
-const toast = (msg, ms=2000) => {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(()=>t.classList.remove('show'), ms);
+const fmtSec = s => Number.isFinite(s) ? fmt(s) : '--:--';
+const toast = (msg, ms=2200) => {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove('show'), ms);
 };
 const ytIdFromUrl = u => {
-  if (!u) return '';
-  if (/^[\w-]{11}$/.test(u)) return u;
+  if (!u) return ''; if (/^[\w-]{11}$/.test(u)) return u;
   const m = u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);
   return m ? m[1] : '';
 };
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function uid(p='s'){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
-//-------------- storage --------------
+//============== Storage ==============
 function loadSettings() {
   try { State.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(LS.settings) || '{}') }; }
   catch(_){ State.settings = { ...DEFAULT_SETTINGS }; }
 }
 function saveSettings() { localStorage.setItem(LS.settings, JSON.stringify(State.settings)); }
 function loadSongsLocal() {
-  try { State.songs = JSON.parse(localStorage.getItem(LS.songs) || '[]'); }
-  catch(_){ State.songs = []; }
+  try { State.songs = JSON.parse(localStorage.getItem(LS.songs) || '[]'); } catch(_){ State.songs = []; }
+  // ensure required fields
+  State.songs.forEach(s => {
+    if (!Array.isArray(s.playlistIds)) s.playlistIds = [];
+    if (!Array.isArray(s.sections)) s.sections = [];
+    if (!s.translations) s.translations = {};
+    if (!s.explanations) s.explanations = {};
+  });
 }
 function saveSongsLocal() { localStorage.setItem(LS.songs, JSON.stringify(State.songs)); }
+function loadPlaylistsLocal() {
+  try { State.playlists = JSON.parse(localStorage.getItem(LS.playlists) || '[]'); } catch(_){ State.playlists = []; }
+  State.currentPlaylistId = localStorage.getItem(LS.currentPl) || 'all';
+}
+function savePlaylistsLocal() { localStorage.setItem(LS.playlists, JSON.stringify(State.playlists)); }
 
-//-------------- GAS bridge (JSONP) --------------
+//============== GAS ==============
 function gas(action, body) {
   return new Promise((resolve, reject) => {
     const url = State.settings.gasUrl;
     if (!url) { reject(new Error('GAS URL 未設定')); return; }
     const cb = 'song_cb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
     const params = new URLSearchParams();
-    params.set('action', action);
-    params.set('callback', cb);
+    params.set('action', action); params.set('callback', cb);
     if (body && typeof body === 'object') {
       Object.keys(body).forEach(k => params.set(k, typeof body[k] === 'object' ? JSON.stringify(body[k]) : String(body[k])));
     }
@@ -383,37 +488,101 @@ function gas(action, body) {
     s.src = url + sep + params.toString();
     window[cb] = (data) => { try { resolve(data); } finally { delete window[cb]; s.remove(); } };
     s.onerror = () => { delete window[cb]; s.remove(); reject(new Error('GAS load error')); };
-    setTimeout(()=>{ if (window[cb]) { delete window[cb]; s.remove(); reject(new Error('GAS timeout')); } }, 12000);
+    setTimeout(()=>{ if (window[cb]) { delete window[cb]; s.remove(); reject(new Error('GAS timeout')); } }, 14000);
     document.body.appendChild(s);
   });
+}
+function gasFromCloudSong(s) {
+  const tryParse = v => { if (!v) return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch(_){ return null; } };
+  return {
+    id: s['ID'], title: s['歌名'], artist: s['歌手'], videoId: s['YouTubeID'],
+    thumb: s['縮圖'], dur: s['時長'], addedAt: s['加入時間'], tag: s['標籤'],
+    playCount: Number(s['播放次數'])||0, lastPlay: s['最後播放'],
+    lrc: s['歌詞LRC'] || '', note: s['備註'] || '',
+    translations: tryParse(s['翻譯JSON']) || {},
+    explanations: tryParse(s['解釋JSON']) || {},
+    sections: tryParse(s['段落JSON']) || [],
+    playlistIds: tryParse(s['歌單IDs']) || (s['歌單IDs'] ? String(s['歌單IDs']).split(',').filter(Boolean) : []),
+    bpm: Number(s['BPM'])||0,
+  };
 }
 async function syncFromGAS() {
   if (!State.settings.gasUrl) return;
   try {
     const r = await gas('getSongs');
     if (r && r.ok && Array.isArray(r.songs)) {
-      State.songs = r.songs.map(s => ({
-        id: s['ID'], title: s['歌名'], artist: s['歌手'], videoId: s['YouTubeID'],
-        thumb: s['縮圖'], dur: s['時長'], addedAt: s['加入時間'], tag: s['標籤'],
-        playCount: Number(s['播放次數'])||0, lastPlay: s['最後播放'], lrc: s['歌詞LRC'] || '', note: s['備註'] || ''
-      }));
-      saveSongsLocal();
-      renderLibrary();
+      State.songs = r.songs.map(gasFromCloudSong);
+      saveSongsLocal(); renderLibrary();
     }
-  } catch(e){ console.warn('sync', e); }
+    const p = await gas('getPlaylists');
+    if (p && p.ok && Array.isArray(p.playlists)) {
+      State.playlists = p.playlists.map(x => ({ id: x['ID'], name: x['名稱'], sortOrder: Number(x['排序'])||0, color: x['顏色'] || '' }));
+      savePlaylistsLocal(); renderPlaylistTabs();
+    }
+    toast('雲端已同步');
+  } catch(e){ toast('雲端同步失敗：' + e.message); }
+}
+function pushSongToCloud(s) {
+  if (!State.settings.gasUrl) return Promise.resolve();
+  return gas('upsertSong', {
+    'ID': s.id, '歌名': s.title, '歌手': s.artist, 'YouTubeID': s.videoId, '縮圖': s.thumb, '時長': s.dur,
+    '標籤': s.tag, '備註': s.note, '歌詞LRC': s.lrc,
+    '翻譯JSON': JSON.stringify(s.translations||{}), '解釋JSON': JSON.stringify(s.explanations||{}),
+    '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
+    'BPM': s.bpm || 0
+  }).catch(e => console.warn('push', e));
 }
 
-//-------------- YouTube IFrame API --------------
+//============== Gemini ==============
+async function gemini(prompt, opts={}) {
+  const key = State.settings.geminiKey;
+  if (!key) throw new Error('未設 Gemini API Key');
+  const model = opts.model || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const r = await fetch(url, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: opts.temp || 0.4, maxOutputTokens: opts.max || 4096 }
+    })
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error('Gemini ' + r.status + ': ' + t.slice(0,200));
+  }
+  const j = await r.json();
+  return j.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+//============== lrclib ==============
+async function lrclibFetch(title, artist, duration) {
+  try {
+    if (artist && title) {
+      const params = new URLSearchParams({ artist_name: artist, track_name: title });
+      if (duration) params.set('duration', String(Math.round(duration)));
+      const r = await fetch('https://lrclib.net/api/get?' + params.toString());
+      if (r.ok) return await r.json();
+    }
+    const sr = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent([title, artist].filter(Boolean).join(' ')));
+    if (sr.ok) {
+      const arr = await sr.json();
+      if (arr.length) return arr[0];
+    }
+  } catch(e){ console.warn('lrclib', e); }
+  return null;
+}
+
+//============== YouTube IFrame ==============
 function onYouTubeIframeAPIReady() {
-  // Mount iframe player on hidden host first; we'll move it visible if needed
   const host = document.getElementById('yt-iframe-mount');
   if (!host) return;
   State.player = new YT.Player(host, {
-    height: '100%', width: '100%',
-    playerVars: { playsinline: 1, controls: 0, rel: 0, modestbranding: 1, iv_load_policy: 3 },
+    height:'100%', width:'100%',
+    playerVars: { playsinline:1, controls:0, rel:0, modestbranding:1, iv_load_policy:3 },
     events: {
-      onReady: () => { State.ready = true; },
+      onReady: () => { State.ready = true; State.player.setPlaybackRate(State.speed); },
       onStateChange: onPlayerState,
+      onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
       onError: e => toast('播放錯誤: ' + e.data)
     }
   });
@@ -423,22 +592,19 @@ window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 function onPlayerState(e) {
   const s = e.data;
   if (s === YT.PlayerState.PLAYING) {
-    State.isPlaying = true;
-    $('#btn-play').textContent = '⏸';
+    State.isPlaying = true; $('#btn-play').textContent = '⏸';
     $('#np-art').classList.add('playing');
     State.duration = State.player.getDuration() || 0;
     $('#np-dur').textContent = fmt(State.duration);
+    drawAbMarkers();
     startProgress();
     if (State.currentId) bumpPlayCount(State.currentId);
+    try { State.player.setPlaybackRate(State.speed); } catch(_){}
   } else if (s === YT.PlayerState.PAUSED) {
-    State.isPlaying = false;
-    $('#btn-play').textContent = '▶';
-    $('#np-art').classList.remove('playing');
-    stopProgress();
+    State.isPlaying = false; $('#btn-play').textContent = '▶';
+    $('#np-art').classList.remove('playing'); stopProgress();
   } else if (s === YT.PlayerState.ENDED) {
-    State.isPlaying = false;
-    $('#btn-play').textContent = '▶';
-    stopProgress();
+    State.isPlaying = false; $('#btn-play').textContent = '▶'; stopProgress();
     playNext();
   }
 }
@@ -452,9 +618,15 @@ function startProgress() {
     $('#np-cur').textContent = fmt(t);
     $('#np-fill').style.width = Math.min(100, (t/d)*100) + '%';
     syncLyric(t);
-  }, 250);
+    syncSection(t);
+    if (State.ab.on && State.ab.b !== null && t >= State.ab.b) {
+      State.player.seekTo(State.ab.a || 0, true);
+    }
+  }, 200);
 }
 function stopProgress() { if (State.progressTimer) { clearInterval(State.progressTimer); State.progressTimer = null; } }
+
+function getCur() { return State.songs.find(s => s.id === State.currentId); }
 
 function playSong(id) {
   const s = State.songs.find(x => x.id === id);
@@ -467,40 +639,41 @@ function playSong(id) {
   art.classList.remove('empty');
   art.innerHTML = s.thumb ? `<img src="${s.thumb}" alt="">` : '<span>♪</span>';
   parseLyrics(s.lrc || '');
+  // restore AB & speed per-song? keep global speed, reset AB
+  State.ab = { a: null, b: null, on: false };
+  drawAbButtons(); drawAbMarkers();
+  applyTheme(sectionThemeAt(0));
   if (State.ready && State.player && State.player.loadVideoById) {
     State.player.loadVideoById(s.videoId);
+    setTimeout(()=>{ try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 600);
   } else {
-    setTimeout(()=>playSong(id), 500);
-    return;
+    setTimeout(()=>playSong(id), 500); return;
   }
   renderLibrary();
 }
 
 function togglePlay() {
   if (!State.currentId) {
-    if (State.songs.length) playSong(State.songs[0].id);
-    return;
+    const list = visibleSongs();
+    if (list.length) playSong(list[0].id); return;
   }
   if (!State.player) return;
-  if (State.isPlaying) State.player.pauseVideo();
-  else State.player.playVideo();
+  if (State.isPlaying) State.player.pauseVideo(); else State.player.playVideo();
 }
 function playNext() {
-  if (!State.songs.length) return;
-  const i = State.songs.findIndex(s => s.id === State.currentId);
-  const n = State.songs[(i+1) % State.songs.length];
-  playSong(n.id);
+  const list = visibleSongs(); if (!list.length) return;
+  const i = list.findIndex(s => s.id === State.currentId);
+  const n = list[(i+1) % list.length]; playSong(n.id);
 }
 function playPrev() {
-  if (!State.songs.length) return;
-  const i = State.songs.findIndex(s => s.id === State.currentId);
-  const p = State.songs[(i-1+State.songs.length) % State.songs.length];
-  playSong(p.id);
+  const list = visibleSongs(); if (!list.length) return;
+  const i = list.findIndex(s => s.id === State.currentId);
+  const p = list[(i-1+list.length) % list.length]; playSong(p.id);
 }
 function shuffle() {
-  if (State.songs.length < 2) return;
-  let i; do { i = Math.floor(Math.random()*State.songs.length); } while (State.songs[i].id === State.currentId);
-  playSong(State.songs[i].id);
+  const list = visibleSongs(); if (list.length < 2) return;
+  let i; do { i = Math.floor(Math.random()*list.length); } while (list[i].id === State.currentId);
+  playSong(list[i].id);
 }
 function seek(delta) {
   if (!State.player || !State.player.getCurrentTime) return;
@@ -509,41 +682,96 @@ function seek(delta) {
 }
 
 async function bumpPlayCount(id) {
-  const s = State.songs.find(x => x.id === id);
-  if (!s) return;
-  s.playCount = (s.playCount || 0) + 1;
-  s.lastPlay = new Date().toISOString();
+  const s = State.songs.find(x => x.id === id); if (!s) return;
+  s.playCount = (s.playCount || 0) + 1; s.lastPlay = new Date().toISOString();
   saveSongsLocal();
   if (State.settings.gasUrl) { try { await gas('incrementPlay', { ID: id }); } catch(_){} }
 }
 
-//-------------- Lyrics --------------
+//============== Speed ==============
+function setSpeed(v) {
+  State.speed = v; updateSpeedLabel();
+  try { State.player && State.player.setPlaybackRate(v); } catch(_){}
+}
+function updateSpeedLabel(){ $('#btn-speed').textContent = State.speed + '×'; }
+function showSpeedMenu() {
+  const menu = $('#speed-menu');
+  if (menu.style.display === 'flex') { menu.style.display='none'; return; }
+  menu.innerHTML = SPEEDS.map(v => `<button data-v="${v}" class="${v===State.speed?'active':''}">${v}×</button>`).join('');
+  menu.querySelectorAll('button').forEach(b => b.addEventListener('click', ()=>{ setSpeed(+b.dataset.v); menu.style.display='none'; }));
+  const r = $('#btn-speed').getBoundingClientRect();
+  menu.style.display='flex';
+  menu.style.left = Math.max(8, r.left - 30) + 'px';
+  menu.style.top = (r.top - 8 - 280) + 'px';
+}
+
+//============== AB Loop ==============
+function drawAbButtons() {
+  $('#btn-ab-a').textContent = 'A: ' + fmtSec(State.ab.a);
+  $('#btn-ab-a').classList.toggle('set', State.ab.a !== null);
+  $('#btn-ab-b').textContent = 'B: ' + fmtSec(State.ab.b);
+  $('#btn-ab-b').classList.toggle('set', State.ab.b !== null);
+  $('#btn-ab-loop').classList.toggle('on', State.ab.on);
+}
+function drawAbMarkers() {
+  const bar = $('#np-bar');
+  bar.querySelectorAll('.ab-marker').forEach(e=>e.remove());
+  if (!State.duration) return;
+  if (State.ab.a !== null) {
+    const m = document.createElement('div'); m.className='ab-marker a';
+    m.style.left = ((State.ab.a/State.duration)*100) + '%'; bar.appendChild(m);
+  }
+  if (State.ab.b !== null) {
+    const m = document.createElement('div'); m.className='ab-marker b';
+    m.style.left = ((State.ab.b/State.duration)*100) + '%'; bar.appendChild(m);
+  }
+}
+function setA() {
+  if (!State.player || !State.player.getCurrentTime) return;
+  State.ab.a = State.player.getCurrentTime() || 0; drawAbButtons(); drawAbMarkers(); toast('A 點 ' + fmt(State.ab.a));
+}
+function setB() {
+  if (!State.player || !State.player.getCurrentTime) return;
+  const t = State.player.getCurrentTime() || 0;
+  if (State.ab.a !== null && t <= State.ab.a) { toast('B 必須在 A 後面'); return; }
+  State.ab.b = t; State.ab.on = true; drawAbButtons(); drawAbMarkers(); toast('B 點 ' + fmt(State.ab.b) + '，循環啟用');
+}
+function toggleAbLoop(){ State.ab.on = !State.ab.on; drawAbButtons(); toast(State.ab.on?'循環 ON':'循環 OFF'); }
+function clearAb(){ State.ab = {a:null,b:null,on:false}; drawAbButtons(); drawAbMarkers(); }
+
+//============== Lyrics ==============
 function parseLyrics(lrc) {
-  State.lyrics = [];
+  State.lyrics = []; State.activeLyricIdx = -1;
   if (!lrc) { renderLyrics(); return; }
   const lines = lrc.split(/\r?\n/);
   const re = /\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
   for (const line of lines) {
-    const stamps = [];
-    let m;
+    const stamps = []; let m;
     while ((m = re.exec(line)) !== null) {
       const min = +m[1], sec = +m[2], ms = m[3] ? +(m[3].padEnd(3,'0').slice(0,3)) : 0;
       stamps.push(min*60 + sec + ms/1000);
     }
-    const text = line.replace(re, '').trim();
-    if (stamps.length === 0 && text) State.lyrics.push({ t: -1, text });
+    const text = line.replace(re,'').trim();
+    if (stamps.length === 0 && text) State.lyrics.push({ t:-1, text });
     else for (const t of stamps) if (text) State.lyrics.push({ t, text });
   }
   State.lyrics.sort((a,b)=>a.t-b.t);
-  State.activeLyricIdx = -1;
   renderLyrics();
 }
 function renderLyrics() {
   const box = $('#lyr-box');
-  if (!State.lyrics.length) { box.innerHTML = '<div class="lyr-empty">尚無歌詞，點 📝 貼 LRC 或純文字</div>'; return; }
-  box.innerHTML = State.lyrics.map((l,i) =>
-    `<div class="lyr-line" data-i="${i}" data-t="${l.t}">${escapeHtml(l.text)}</div>`
-  ).join('');
+  if (!State.lyrics.length) { box.innerHTML = '<div class="lyr-empty">尚無歌詞，點 📝 貼 LRC、🌐 自動抓、或 ✨ AI 生成</div>'; return; }
+  const cur = getCur();
+  const trs = (cur && cur.translations) || {};
+  const exs = (cur && cur.explanations) || {};
+  box.innerHTML = State.lyrics.map((l,i) => {
+    const tr = trs[i]; const ex = exs[i];
+    return `<div class="lyr-line" data-i="${i}" data-t="${l.t}">
+      <div>${escapeHtml(l.text)}</div>
+      ${tr ? `<div class="lyr-tr">${escapeHtml(tr)}</div>` : ''}
+      ${ex ? `<div class="lyr-ex">${escapeHtml(ex)}</div>` : ''}
+    </div>`;
+  }).join('');
   box.querySelectorAll('.lyr-line').forEach(el => {
     el.addEventListener('click', () => {
       const t = +el.dataset.t;
@@ -556,8 +784,7 @@ function syncLyric(t) {
   let idx = -1;
   for (let i = 0; i < State.lyrics.length; i++) {
     if (State.lyrics[i].t < 0) continue;
-    if (State.lyrics[i].t <= t) idx = i;
-    else break;
+    if (State.lyrics[i].t <= t) idx = i; else break;
   }
   if (idx === State.activeLyricIdx) return;
   State.activeLyricIdx = idx;
@@ -565,19 +792,154 @@ function syncLyric(t) {
   box.querySelectorAll('.lyr-line').forEach(el => el.classList.remove('active'));
   if (idx >= 0) {
     const el = box.querySelector(`.lyr-line[data-i="${idx}"]`);
-    if (el) {
-      el.classList.add('active');
-      el.scrollIntoView({ behavior:'smooth', block:'center' });
-    }
+    if (el) { el.classList.add('active'); el.scrollIntoView({ behavior:'smooth', block:'center' }); }
   }
 }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-//-------------- Library render --------------
+async function fetchLrclib() {
+  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
+  toast('搜尋歌詞中…');
+  const r = await lrclibFetch(s.title, s.artist, State.duration);
+  if (!r) { toast('lrclib 沒找到，可改用 ✨ AI 生成'); return; }
+  const lrc = r.syncedLyrics || r.plainLyrics || '';
+  if (!lrc) { toast('找到但沒歌詞'); return; }
+  s.lrc = lrc; saveSongsLocal(); parseLyrics(lrc); pushSongToCloud(s);
+  toast(r.syncedLyrics ? '同步歌詞已載入' : '純文字歌詞已載入');
+}
+async function aiGenerateLrc() {
+  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
+  if (!State.settings.geminiKey) { toast('請先到 ⚙ 設定 Gemini API Key'); return; }
+  toast('AI 產生歌詞中…');
+  const dur = State.duration || 0;
+  const prompt = `你是音樂助理。為以下歌曲產生 LRC 格式逐句歌詞（含時間戳）：
+歌名：${s.title}
+歌手：${s.artist || '未知'}
+總長度：${dur ? Math.round(dur)+' 秒' : '未知'}
+
+要求：
+1. 只輸出 LRC 內容，每行格式 [mm:ss.xx]歌詞
+2. 時間戳要根據歌曲總長度均勻分布（若已知歌詞請用準確時間，未知就估算）
+3. 不要輸出任何說明文字、不要 markdown 包裹
+4. 若不確定歌詞內容，可生成最有可能的版本
+
+開始：`;
+  try {
+    let txt = await gemini(prompt, { temp: 0.3, max: 3000 });
+    txt = txt.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
+    if (!/\[\d/.test(txt)) { toast('AI 回的格式不對'); return; }
+    s.lrc = txt; saveSongsLocal(); parseLyrics(txt); pushSongToCloud(s);
+    toast('AI 歌詞已生成，可手動微調');
+  } catch(e) { toast('AI 失敗：' + e.message); }
+}
+async function translateAll() {
+  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
+  if (!State.lyrics.length) { toast('沒有歌詞'); return; }
+  if (!State.settings.geminiKey) { toast('請先到 ⚙ 設定 Gemini API Key'); return; }
+  toast('AI 翻譯解釋中…');
+  const lines = State.lyrics.map((l,i)=>`${i}: ${l.text}`).join('\n');
+  const prompt = `將下列歌詞逐句翻譯為繁體中文,並對外文/詩意/俚語提供「註解」。輸出純 JSON 陣列(不要 markdown)：
+[{"i":0,"tr":"翻譯","ex":"註(無則空字串)"},...]
+若原文已是中文,翻譯保持原句,但 ex 可加文化/修辭解析。
+
+歌詞:
+${lines}`;
+  try {
+    let txt = await gemini(prompt, { temp: 0.4, max: 6000 });
+    txt = txt.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
+    const arr = JSON.parse(txt);
+    s.translations = s.translations || {}; s.explanations = s.explanations || {};
+    arr.forEach(x => {
+      if (x.tr) s.translations[x.i] = x.tr;
+      if (x.ex) s.explanations[x.i] = x.ex;
+    });
+    saveSongsLocal(); renderLyrics(); pushSongToCloud(s);
+    toast('翻譯完成');
+  } catch(e) { toast('翻譯失敗：' + e.message); }
+}
+
+//============== Sections / Theme ==============
+function applyTheme(name) {
+  if (State.currentTheme === name) return;
+  State.currentTheme = name;
+  document.body.classList.remove(...THEMES.map(t=>'theme-'+t));
+  if (name && name !== 'default') document.body.classList.add('theme-' + name);
+}
+function sectionThemeAt(t) {
+  const s = getCur(); if (!s || !Array.isArray(s.sections) || !s.sections.length) return 'default';
+  const sorted = [...s.sections].sort((a,b)=>a.t-b.t);
+  let cur = 'default';
+  for (const x of sorted) { if (x.t <= t) cur = x.theme || 'default'; else break; }
+  return cur;
+}
+function syncSection(t) { applyTheme(sectionThemeAt(t)); }
+
+function renderSecEditor() {
+  const s = getCur(); if (!s) { $('#sec-list').innerHTML = '<div class="lyr-empty">先選一首歌</div>'; return; }
+  const list = (s.sections || []).slice().sort((a,b)=>a.t-b.t);
+  if (!list.length) { $('#sec-list').innerHTML = '<div class="lyr-empty">尚無段落,按下方加</div>'; return; }
+  $('#sec-list').innerHTML = list.map((x, i) => `
+    <div class="sec-row">
+      <span class="sec-time" data-jump="${x.t}">${fmt(x.t)}</span>
+      <select data-i="${i}" data-k="theme">
+        ${THEMES.map(t=>`<option value="${t}" ${x.theme===t?'selected':''}>${THEME_LABELS[t]}</option>`).join('')}
+      </select>
+      <input type="text" data-i="${i}" data-k="label" placeholder="主歌/副歌/橋段" value="${escapeHtml(x.label||'')}">
+      <button class="x" data-del="${i}">✕</button>
+    </div>`).join('');
+  $('#sec-list').querySelectorAll('[data-jump]').forEach(el => el.addEventListener('click', () => {
+    const t = +el.dataset.jump; if (State.player && State.player.seekTo) State.player.seekTo(t, true);
+  }));
+  $('#sec-list').querySelectorAll('select,input').forEach(el => el.addEventListener('change', e => {
+    const i = +el.dataset.i, k = el.dataset.k;
+    s.sections.sort((a,b)=>a.t-b.t);
+    s.sections[i][k] = el.value;
+  }));
+  $('#sec-list').querySelectorAll('[data-del]').forEach(el => el.addEventListener('click', () => {
+    const i = +el.dataset.del; s.sections.sort((a,b)=>a.t-b.t); s.sections.splice(i,1); renderSecEditor();
+  }));
+}
+function secAddNow() {
+  const s = getCur(); if (!s) return;
+  const t = (State.player && State.player.getCurrentTime && State.player.getCurrentTime()) || 0;
+  s.sections = s.sections || [];
+  s.sections.push({ t: Math.round(t*10)/10, theme: 'default', label: '' });
+  renderSecEditor();
+}
+function secAddZero() {
+  const s = getCur(); if (!s) return;
+  s.sections = s.sections || [];
+  if (!s.sections.some(x => x.t === 0)) s.sections.push({ t:0, theme:'default', label:'' });
+  renderSecEditor();
+}
+async function saveSec() {
+  const s = getCur(); if (!s) return;
+  s.sections = (s.sections || []).filter(x => Number.isFinite(x.t)).sort((a,b)=>a.t-b.t);
+  saveSongsLocal(); pushSongToCloud(s);
+  $('#modal-sections').classList.remove('show');
+  toast('段落已儲存');
+}
+
+//============== Library / Playlists ==============
+function visibleSongs() {
+  if (State.currentPlaylistId === 'all') return State.songs;
+  return State.songs.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(State.currentPlaylistId));
+}
+function renderPlaylistTabs() {
+  const tabs = $('#pl-tabs');
+  const pls = [{ id:'all', name:'全部' }, ...State.playlists.sort((a,b)=>a.sortOrder-b.sortOrder)];
+  tabs.innerHTML = pls.map(p => `<button class="pl-tab ${p.id===State.currentPlaylistId?'active':''}" data-id="${p.id}">${escapeHtml(p.name)}</button>`).join('') +
+    `<button class="pl-tab add" id="btn-pl-mgr">＋ 管理</button>`;
+  tabs.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => {
+    State.currentPlaylistId = b.dataset.id;
+    localStorage.setItem(LS.currentPl, b.dataset.id);
+    renderPlaylistTabs(); renderLibrary();
+  }));
+  $('#btn-pl-mgr').addEventListener('click', openPlMgr);
+}
 function renderLibrary(filter='') {
   const list = $('#lib-list');
-  const q = filter.trim().toLowerCase();
-  const items = State.songs.filter(s => {
+  const q = (filter || $('#lib-q').value || '').trim().toLowerCase();
+  const items = visibleSongs().filter(s => {
     if (!q) return true;
     return [s.title, s.artist, s.tag].filter(Boolean).join(' ').toLowerCase().includes(q);
   });
@@ -592,81 +954,148 @@ function renderLibrary(filter='') {
         <div class="song-title">${escapeHtml(s.title || '(未命名)')}</div>
         <div class="song-meta">
           ${s.artist ? `<span>${escapeHtml(s.artist)}</span>` : ''}
-          ${s.tag ? `<span class="song-tag">${escapeHtml(s.tag)}</span>` : ''}
+          ${s.playlistIds && s.playlistIds.length ? `<span class="song-tag">${s.playlistIds.length} 個歌單</span>` : ''}
           ${s.playCount ? `<span>▶ ${s.playCount}</span>` : ''}
         </div>
       </div>
       <div class="song-act">
-        <button data-act="del" title="刪除">🗑</button>
+        <button data-act="more" title="更多">⋯</button>
       </div>
     </div>`).join('');
   list.querySelectorAll('.song-row').forEach(row => {
     row.addEventListener('click', e => {
-      if (e.target.closest('[data-act="del"]')) return;
-      playSong(row.dataset.id);
-      switchPage('player');
+      if (e.target.closest('[data-act]')) return;
+      playSong(row.dataset.id); switchPage('player');
     });
-    const del = row.querySelector('[data-act="del"]');
-    if (del) del.addEventListener('click', e => { e.stopPropagation(); deleteSong(row.dataset.id); });
+    const more = row.querySelector('[data-act="more"]');
+    if (more) more.addEventListener('click', e => { e.stopPropagation(); openSongSheet(row.dataset.id); });
   });
 }
+function openSongSheet(id) {
+  const s = State.songs.find(x => x.id === id); if (!s) return;
+  $('#sheet-title').textContent = s.title || '(未命名)';
+  const pls = State.playlists.sort((a,b)=>a.sortOrder-b.sortOrder);
+  s.playlistIds = s.playlistIds || [];
+  $('#sheet-body').innerHTML = `
+    <div style="margin-bottom:14px">
+      <div class="gc-t">所屬歌單（可多選）</div>
+      <div id="sheet-pls">
+        ${pls.length ? pls.map(p => `<span class="chip ${s.playlistIds.includes(p.id)?'active':''}" data-pl="${p.id}">${escapeHtml(p.name)}</span>`).join('') : '<div class="lyr-empty" style="padding:10px">還沒有歌單分組,可到歌單頁右側「＋管理」建立</div>'}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn pri" data-sheet-act="play">▶ 播放</button>
+      <button class="btn" data-sheet-act="addtag">標籤</button>
+      <button class="btn danger" data-sheet-act="del">刪除</button>
+    </div>`;
+  $('#sheet-body').querySelectorAll('[data-pl]').forEach(c => c.addEventListener('click', async () => {
+    const pid = c.dataset.pl;
+    const i = s.playlistIds.indexOf(pid);
+    if (i >= 0) s.playlistIds.splice(i,1); else s.playlistIds.push(pid);
+    c.classList.toggle('active');
+    saveSongsLocal();
+    pushSongToCloud(s);
+    renderLibrary();
+  }));
+  $('#sheet-body').querySelector('[data-sheet-act="play"]').addEventListener('click', () => {
+    closeSheet(); playSong(s.id); switchPage('player');
+  });
+  $('#sheet-body').querySelector('[data-sheet-act="addtag"]').addEventListener('click', async () => {
+    const t = prompt('標籤(空白以逗號分隔):', s.tag || '');
+    if (t === null) return;
+    s.tag = t.trim(); saveSongsLocal(); pushSongToCloud(s); renderLibrary();
+  });
+  $('#sheet-body').querySelector('[data-sheet-act="del"]').addEventListener('click', () => { closeSheet(); deleteSong(s.id); });
+  $('#sheet-song').classList.add('show');
+}
+function closeSheet(){ $('#sheet-song').classList.remove('show'); }
 
 async function deleteSong(id) {
   if (!confirm('確定刪除這首歌嗎？')) return;
   State.songs = State.songs.filter(s => s.id !== id);
   saveSongsLocal();
   if (State.settings.gasUrl) { try { await gas('deleteSong', { ID: id }); } catch(_){} }
-  renderLibrary($('#lib-q').value);
-  toast('已刪除');
+  renderLibrary(); toast('已刪除');
 }
 
-//-------------- Add song --------------
+function openPlMgr() {
+  const m = $('#modal-pl');
+  const pls = [...State.playlists].sort((a,b)=>a.sortOrder-b.sortOrder);
+  $('#pl-mgr').innerHTML = pls.length ? pls.map(p => `
+    <div class="sec-row" data-pid="${p.id}">
+      <input type="text" data-k="name" value="${escapeHtml(p.name)}" style="flex:2">
+      <input type="number" data-k="sortOrder" value="${p.sortOrder||0}" style="width:60px;flex:0">
+      <button class="x" data-del-pl="${p.id}">✕</button>
+    </div>`).join('') : '<div class="lyr-empty">尚無歌單,在下方建立</div>';
+  $('#pl-mgr').querySelectorAll('[data-pid]').forEach(row => {
+    row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
+      const pid = row.dataset.pid;
+      const p = State.playlists.find(x => x.id === pid); if (!p) return;
+      const k = inp.dataset.k;
+      p[k] = (k === 'sortOrder') ? (Number(inp.value)||0) : inp.value;
+      savePlaylistsLocal(); renderPlaylistTabs();
+      if (State.settings.gasUrl) gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': p.color || '' }).catch(()=>{});
+    }));
+    row.querySelector('[data-del-pl]').addEventListener('click', async () => {
+      if (!confirm('刪除這個歌單分組?(歌曲不會被刪除)')) return;
+      const pid = row.dataset.pid;
+      State.playlists = State.playlists.filter(p => p.id !== pid);
+      State.songs.forEach(s => { if (s.playlistIds) s.playlistIds = s.playlistIds.filter(x => x !== pid); });
+      savePlaylistsLocal(); saveSongsLocal();
+      if (State.settings.gasUrl) try { await gas('deletePlaylist', { ID: pid }); } catch(_){}
+      if (State.currentPlaylistId === pid) State.currentPlaylistId = 'all';
+      renderPlaylistTabs(); renderLibrary(); openPlMgr();
+    });
+  });
+  m.classList.add('show');
+}
+async function createPlaylist() {
+  const name = $('#pl-new-name').value.trim(); if (!name) return;
+  const p = { id: uid('pl'), name, sortOrder: State.playlists.length, color: '' };
+  State.playlists.push(p); savePlaylistsLocal();
+  $('#pl-new-name').value = '';
+  if (State.settings.gasUrl) { try { await gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': '' }); } catch(_){} }
+  renderPlaylistTabs(); openPlMgr();
+}
+
+//============== Add song ==============
 async function searchYouTube(q) {
-  if (!State.settings.ytKey) {
-    toast('請先到 ⚙ 設定填 YouTube API Key');
-    return [];
-  }
+  if (!State.settings.ytKey) { toast('請先到 ⚙ 設定 YouTube API Key'); return []; }
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(q)}&key=${State.settings.ytKey}`;
   const r = await fetch(url);
   if (!r.ok) { toast('搜尋失敗 ' + r.status); return []; }
   const j = await r.json();
   return (j.items || []).map(it => ({
-    videoId: it.id.videoId,
-    title: it.snippet.title,
-    artist: it.snippet.channelTitle,
+    videoId: it.id.videoId, title: it.snippet.title, artist: it.snippet.channelTitle,
     thumb: (it.snippet.thumbnails.medium || it.snippet.thumbnails.default).url
   }));
 }
-
 async function addSong(s) {
-  if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return; }
+  if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
   const local = {
-    id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    title: s.title, artist: s.artist || '', videoId: s.videoId,
+    id: uid(), title: s.title, artist: s.artist || '', videoId: s.videoId,
     thumb: s.thumb || `https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg`,
-    dur:'', addedAt: new Date().toISOString(), tag:'', playCount:0, lastPlay:'', lrc:'', note:''
+    dur:'', addedAt: new Date().toISOString(), tag:'', playCount:0, lastPlay:'',
+    lrc:'', note:'', translations:{}, explanations:{}, sections:[],
+    playlistIds: State.currentPlaylistId === 'all' ? [] : [State.currentPlaylistId], bpm: 0
   };
-  State.songs.unshift(local);
-  saveSongsLocal();
-  renderLibrary();
+  State.songs.unshift(local); saveSongsLocal(); renderLibrary();
   toast('已加入歌單');
   if (State.settings.gasUrl) {
     try {
-      const r = await gas('addSong', {
-        '歌名': local.title, '歌手': local.artist, 'YouTubeID': local.videoId,
-        '縮圖': local.thumb, '時長': local.dur
+      const r = await gas('upsertSong', {
+        'ID': local.id, '歌名': local.title, '歌手': local.artist, 'YouTubeID': local.videoId,
+        '縮圖': local.thumb, '時長': local.dur, '歌單IDs': JSON.stringify(local.playlistIds)
       });
-      if (r && r.ok && r.id) { local.id = r.id; saveSongsLocal(); renderLibrary(); }
-    } catch(e){ console.warn('cloud add failed', e); }
+      if (r && r.ok) {/* keep client id */}
+    } catch(e){ console.warn('cloud add', e); }
   }
+  return local;
 }
-
 async function addByUrl() {
   const raw = $('#url-input').value.trim();
-  const id = ytIdFromUrl(raw);
-  if (!id) { toast('網址或 ID 無效'); return; }
-  const t = $('#url-title').value.trim();
-  const a = $('#url-artist').value.trim();
+  const id = ytIdFromUrl(raw); if (!id) { toast('網址或 ID 無效'); return; }
+  const t = $('#url-title').value.trim(), a = $('#url-artist').value.trim();
   let title = t, artist = a;
   if (!title) {
     try {
@@ -679,13 +1108,12 @@ async function addByUrl() {
   $('#url-input').value = ''; $('#url-title').value = ''; $('#url-artist').value = '';
 }
 
-//-------------- Voice control --------------
+//============== Voice ==============
 function initVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
   State.recognition = new SR();
-  State.recognition.continuous = false;
-  State.recognition.interimResults = true;
+  State.recognition.continuous = false; State.recognition.interimResults = true;
   State.recognition.lang = State.settings.lang || 'zh-TW';
   State.recognition.onresult = e => {
     const last = e.results[e.results.length - 1];
@@ -712,14 +1140,16 @@ function endVoice() {
 }
 function handleVoice(txt) {
   const t = txt.toLowerCase().replace(/\s+/g,'');
-  if (/(暫停|pause|停)/.test(t)) { if (State.player) State.player.pauseVideo(); toast('暫停'); endVoice(); return; }
-  if (/(繼續|播放|play)$/.test(t) || t === '繼續' || t === '播放') {
-    if (State.player) State.player.playVideo(); toast('繼續播放'); endVoice(); return;
-  }
-  if (/(下一首|next|下一個)/.test(t)) { playNext(); toast('下一首'); endVoice(); return; }
-  if (/(上一首|prev|前一首)/.test(t)) { playPrev(); toast('上一首'); endVoice(); return; }
-  if (/(隨機|shuffle|亂數)/.test(t)) { shuffle(); toast('隨機播放'); endVoice(); return; }
-  // 播放 XXX
+  if (/(暫停|pause)/.test(t)) { State.player && State.player.pauseVideo(); toast('暫停'); endVoice(); return; }
+  if (t === '繼續' || t === '播放' || /^play$/.test(t)) { State.player && State.player.playVideo(); toast('繼續'); endVoice(); return; }
+  if (/(下一首|next|下一個)/.test(t)) { playNext(); endVoice(); return; }
+  if (/(上一首|prev|前一首)/.test(t)) { playPrev(); endVoice(); return; }
+  if (/(隨機|shuffle)/.test(t)) { shuffle(); toast('隨機'); endVoice(); return; }
+  if (/(快一點|加速|speedup)/.test(t)) { const i = SPEEDS.indexOf(State.speed); setSpeed(SPEEDS[Math.min(SPEEDS.length-1, i+1)]); toast('速度 ' + State.speed + '×'); endVoice(); return; }
+  if (/(慢一點|減速|slowdown)/.test(t)) { const i = SPEEDS.indexOf(State.speed); setSpeed(SPEEDS[Math.max(0, i-1)]); toast('速度 ' + State.speed + '×'); endVoice(); return; }
+  if (/(原速|正常速度|normal)/.test(t)) { setSpeed(1); toast('原速'); endVoice(); return; }
+  if (/(翻譯歌詞|translate)/.test(t)) { endVoice(); translateAll(); return; }
+  if (/(抓歌詞|找歌詞|fetchlyrics)/.test(t)) { endVoice(); fetchLrclib(); return; }
   let m = txt.match(/(?:播放|播|放|聽|找|搜尋|搜)\s*(.+)/);
   if (m) {
     const q = m[1].replace(/[?？。！，,.\s]+$/,'').trim();
@@ -734,54 +1164,30 @@ function handleVoice(txt) {
   }
   toast('聽不懂：' + txt); endVoice();
 }
-
 async function voiceSearchAndPlay(q) {
-  if (!State.settings.ytKey) {
-    toast('歌單沒有「' + q + '」，且未設定 YouTube API Key');
-    endVoice(); return;
-  }
+  if (!State.settings.ytKey) { toast('歌單沒有「' + q + '」,且未設 YouTube Key'); endVoice(); return; }
   $('#voice-text').textContent = '搜尋 YouTube：' + q + '…';
   try {
     const items = await searchYouTube(q);
-    if (!items.length) { toast('YouTube 沒搜到「' + q + '」'); endVoice(); return; }
+    if (!items.length) { toast('YouTube 沒搜到'); endVoice(); return; }
     const top = items[0];
     if (State.songs.some(x => x.videoId === top.videoId)) {
       const exist = State.songs.find(x => x.videoId === top.videoId);
       playSong(exist.id); toast('▶ ' + exist.title); endVoice(); return;
     }
-    const local = {
-      id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-      title: top.title, artist: top.artist || '', videoId: top.videoId,
-      thumb: top.thumb, dur:'', addedAt: new Date().toISOString(),
-      tag:'', playCount:0, lastPlay:'', lrc:'', note:''
-    };
-    State.songs.unshift(local);
-    saveSongsLocal();
-    renderLibrary();
-    if (State.settings.gasUrl) {
-      gas('addSong', {
-        '歌名': local.title, '歌手': local.artist, 'YouTubeID': local.videoId,
-        '縮圖': local.thumb, '時長': local.dur
-      }).then(r => {
-        if (r && r.ok && r.id) { local.id = r.id; saveSongsLocal(); renderLibrary(); }
-      }).catch(()=>{});
-    }
-    playSong(local.id);
-    toast('▶ ' + top.title);
-    endVoice();
-  } catch (e) {
-    toast('搜尋失敗：' + (e.message || e));
-    endVoice();
-  }
+    const local = await addSong(top);
+    if (local) playSong(local.id);
+    toast('▶ ' + top.title); endVoice();
+  } catch (e) { toast('搜尋失敗：' + (e.message || e)); endVoice(); }
 }
 
-//-------------- Page nav --------------
+//============== Page nav ==============
 function switchPage(name) {
   $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
   $$('.nb').forEach(b => b.classList.toggle('active', b.dataset.page === name));
 }
 
-//-------------- Bind events --------------
+//============== Bind ==============
 function bind() {
   $$('.nb').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
   $('#btn-play').addEventListener('click', togglePlay);
@@ -797,6 +1203,19 @@ function bind() {
     $('#np-vis').classList.toggle('on', State.videoVisible);
     $('#np-art').style.display = State.videoVisible ? 'none' : '';
   });
+  $('#btn-speed').addEventListener('click', showSpeedMenu);
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#speed-menu') && !e.target.closest('#btn-speed')) $('#speed-menu').style.display='none';
+  });
+
+  $('#btn-ab-a').addEventListener('click', setA);
+  $('#btn-ab-b').addEventListener('click', setB);
+  $('#btn-ab-loop').addEventListener('click', toggleAbLoop);
+  $('#btn-ab-clear').addEventListener('click', clearAb);
+
+  $('#btn-fetch-lrc').addEventListener('click', fetchLrclib);
+  $('#btn-ai-lrc').addEventListener('click', aiGenerateLrc);
+  $('#btn-translate-all').addEventListener('click', translateAll);
 
   $('#np-bar').addEventListener('click', e => {
     if (!State.duration || !State.player) return;
@@ -807,7 +1226,6 @@ function bind() {
 
   $('#lib-q').addEventListener('input', e => renderLibrary(e.target.value));
 
-  // Add page tabs
   $$('.search-tabs button').forEach(b => b.addEventListener('click', () => {
     $$('.search-tabs button').forEach(x => x.classList.toggle('active', x === b));
     $('#tab-search').style.display = b.dataset.tab === 'search' ? '' : 'none';
@@ -834,71 +1252,68 @@ function bind() {
   $('#yt-q').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-yt-search').click(); });
   $('#btn-add-url').addEventListener('click', addByUrl);
 
-  // Settings
   $('#btn-settings').addEventListener('click', () => {
     $('#set-yt-key').value = State.settings.ytKey || '';
+    $('#set-gemini-key').value = State.settings.geminiKey || '';
     $('#set-gas-url').value = State.settings.gasUrl || '';
     $('#set-lang').value = State.settings.lang || 'zh-TW';
     $('#modal-settings').classList.add('show');
   });
   $('#btn-save-settings').addEventListener('click', () => {
     State.settings.ytKey = $('#set-yt-key').value.trim();
+    State.settings.geminiKey = $('#set-gemini-key').value.trim();
     State.settings.gasUrl = $('#set-gas-url').value.trim();
     State.settings.lang = $('#set-lang').value;
     saveSettings();
     if (State.recognition) State.recognition.lang = State.settings.lang;
-    $('#modal-settings').classList.remove('show');
-    toast('已儲存');
+    $('#modal-settings').classList.remove('show'); toast('已儲存');
     if (State.settings.gasUrl) syncFromGAS();
   });
+  $('#btn-resync').addEventListener('click', syncFromGAS);
 
-  // Lyrics edit
   $('#btn-edit-lrc').addEventListener('click', () => {
     if (!State.currentId) { toast('請先選一首歌'); return; }
-    const s = State.songs.find(x => x.id === State.currentId);
-    $('#lrc-input').value = s ? (s.lrc || '') : '';
+    const s = getCur(); $('#lrc-input').value = s ? (s.lrc || '') : '';
     $('#modal-lrc').classList.add('show');
   });
   $('#btn-save-lrc').addEventListener('click', async () => {
     if (!State.currentId) return;
     const lrc = $('#lrc-input').value;
-    const s = State.songs.find(x => x.id === State.currentId);
-    if (s) { s.lrc = lrc; saveSongsLocal(); parseLyrics(lrc); }
-    if (State.settings.gasUrl) { try { await gas('saveLyrics', { ID: State.currentId, '歌詞LRC': lrc }); } catch(_){} }
-    $('#modal-lrc').classList.remove('show');
-    toast('歌詞已儲存');
+    const s = getCur(); if (s) { s.lrc = lrc; saveSongsLocal(); parseLyrics(lrc); pushSongToCloud(s); }
+    $('#modal-lrc').classList.remove('show'); toast('歌詞已儲存');
   });
 
-  // Modal close
+  $('#btn-sections').addEventListener('click', () => {
+    if (!State.currentId) { toast('請先選一首歌'); return; }
+    renderSecEditor(); $('#modal-sections').classList.add('show');
+  });
+  $('#btn-sec-add-now').addEventListener('click', secAddNow);
+  $('#btn-sec-add-zero').addEventListener('click', secAddZero);
+  $('#btn-save-sec').addEventListener('click', saveSec);
+
+  $('#btn-pl-create').addEventListener('click', createPlaylist);
+  $('#pl-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createPlaylist(); });
+
   $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('show')));
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
+  $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheet));
 }
 
-//-------------- Init --------------
+//============== Init ==============
 async function init() {
-  loadSettings();
-  loadSongsLocal();
-  bind();
-  initVoice();
-  renderLibrary();
+  loadSettings(); loadSongsLocal(); loadPlaylistsLocal();
+  bind(); initVoice(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
   if (State.settings.gasUrl) await syncFromGAS();
-  // Restore last
   const lastId = localStorage.getItem(LS.current);
   if (lastId && State.songs.some(s => s.id === lastId)) {
-    // load metadata only, don't autoplay
     const s = State.songs.find(x => x.id === lastId);
     State.currentId = lastId;
-    $('#np-title').textContent = s.title || '';
-    $('#np-artist').textContent = s.artist || '';
-    const art = $('#np-art');
-    art.classList.remove('empty');
+    $('#np-title').textContent = s.title || ''; $('#np-artist').textContent = s.artist || '';
+    const art = $('#np-art'); art.classList.remove('empty');
     art.innerHTML = s.thumb ? `<img src="${s.thumb}">` : '<span>♪</span>';
     parseLyrics(s.lrc || '');
   }
-  // Service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 init();
 </script>
