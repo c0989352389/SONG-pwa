@@ -769,7 +769,7 @@ function onYouTubeIframeAPIReady() {
       onReady: () => { State.ready = true; State.player.setPlaybackRate(State.speed); },
       onStateChange: onPlayerState,
       onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
-      onError: e => toast('播放錯誤: ' + e.data)
+      onError: e => handleYtError(e.data)
     }
   });
 }
@@ -876,6 +876,41 @@ function seek(delta) {
   if (!State.player || !State.player.getCurrentTime) return;
   const t = (State.player.getCurrentTime() || 0) + delta;
   State.player.seekTo(Math.max(0, t), true);
+}
+
+function handleYtError(code) {
+  const s = getCur();
+  if (code === 101 || code === 150) {
+    toast('影片禁止嵌入,自動找替代版本…', 2500);
+    if (s) autoFallback(s);
+  } else if (code === 100) {
+    toast('影片不存在或已下架');
+  } else if (code === 5) {
+    toast('HTML5 播放錯誤');
+  } else if (code === 2) {
+    toast('影片 ID 無效');
+  } else {
+    toast('YouTube 錯誤碼 ' + code);
+  }
+}
+
+async function autoFallback(s) {
+  if (!State.settings.ytKey) { toast('需 YouTube API Key 才能找替代版本'); return; }
+  const q = [s.title, s.artist].filter(Boolean).join(' ');
+  let items = [];
+  try { items = await searchYouTube(q); } catch(e){ toast('搜尋失敗：' + e.message); return; }
+  const alt = items.find(it => it.videoId !== s.videoId);
+  if (!alt) { toast('找不到替代版本'); return; }
+  s.videoId = alt.videoId;
+  s.thumb = alt.thumb || s.thumb;
+  if (alt.title) s.title = alt.title;
+  if (alt.artist) s.artist = alt.artist;
+  saveSongsLocal(); pushSongToCloud(s);
+  $('#np-title').textContent = s.title;
+  $('#np-artist').textContent = s.artist || '';
+  $('#np-art').innerHTML = `<img src="${s.thumb}" alt=""><div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>`;
+  toast('已換版本: ' + (alt.title || ''));
+  if (State.player && State.player.loadVideoById) State.player.loadVideoById(alt.videoId);
 }
 
 function setupMediaSession(s) {
