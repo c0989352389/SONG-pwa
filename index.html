@@ -785,7 +785,10 @@ function onPlayerState(e) {
     $('#np-dur').textContent = fmt(State.duration);
     drawAbMarkers();
     startProgress();
-    if (State.currentId) bumpPlayCount(State.currentId);
+    if (State.currentId) {
+      bumpPlayCount(State.currentId);
+      const cur = getCur(); if (cur) { cur._fallbackTries = 0; cur._triedVids = [cur.videoId]; }
+    }
     try { State.player.setPlaybackRate(State.speed); } catch(_){}
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     startThemeCycle();
@@ -896,11 +899,18 @@ function handleYtError(code) {
 
 async function autoFallback(s) {
   if (!State.settings.ytKey) { toast('需 YouTube API Key 才能找替代版本'); return; }
-  const q = [s.title, s.artist].filter(Boolean).join(' ');
+  s._fallbackTries = (s._fallbackTries || 0) + 1;
+  if (s._fallbackTries > 4) { toast('多版本都無法播放,建議手動換首歌'); return; }
+  const tried = new Set(s._triedVids || []);
+  tried.add(s.videoId);
+  const cleanT = s.title.replace(/\s*-\s*Topic$/i,'').replace(/[\(（\[【].*?[\)）\]】]/g,'').trim();
+  const q = [cleanT, (s.artist||'').replace(/\s*-\s*Topic$/i,'')].filter(Boolean).join(' ');
   let items = [];
   try { items = await searchYouTube(q); } catch(e){ toast('搜尋失敗：' + e.message); return; }
-  const alt = items.find(it => it.videoId !== s.videoId);
-  if (!alt) { toast('找不到替代版本'); return; }
+  const alt = items.find(it => it.videoId && !tried.has(it.videoId));
+  if (!alt) { toast('找不到能播的替代版本'); return; }
+  tried.add(alt.videoId);
+  s._triedVids = [...tried];
   s.videoId = alt.videoId;
   s.thumb = alt.thumb || s.thumb;
   if (alt.title) s.title = alt.title;
@@ -1300,10 +1310,12 @@ async function searchYouTube(q) {
   const r = await fetch(url);
   if (!r.ok) { toast('搜尋失敗 ' + r.status); return []; }
   const j = await r.json();
-  return (j.items || []).map(it => ({
-    videoId: it.id.videoId, title: it.snippet.title, artist: it.snippet.channelTitle,
-    thumb: (it.snippet.thumbnails.medium || it.snippet.thumbnails.default).url
-  }));
+  return (j.items || [])
+    .filter(it => it && it.id && it.id.videoId)
+    .map(it => ({
+      videoId: it.id.videoId, title: it.snippet.title, artist: it.snippet.channelTitle,
+      thumb: (it.snippet.thumbnails.medium || it.snippet.thumbnails.default).url
+    }));
 }
 async function addSong(s) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
