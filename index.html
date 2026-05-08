@@ -720,7 +720,7 @@ function handleVoice(txt) {
   if (/(上一首|prev|前一首)/.test(t)) { playPrev(); toast('上一首'); endVoice(); return; }
   if (/(隨機|shuffle|亂數)/.test(t)) { shuffle(); toast('隨機播放'); endVoice(); return; }
   // 播放 XXX
-  let m = txt.match(/(?:播放|播|放|聽|找)\s*(.+)/);
+  let m = txt.match(/(?:播放|播|放|聽|找|搜尋|搜)\s*(.+)/);
   if (m) {
     const q = m[1].replace(/[?？。！，,.\s]+$/,'').trim();
     if (q) {
@@ -729,10 +729,50 @@ function handleVoice(txt) {
         (s.artist && s.artist.toLowerCase().includes(q.toLowerCase()))
       );
       if (hit) { playSong(hit.id); toast('▶ ' + hit.title); endVoice(); return; }
-      toast('歌單沒有「' + q + '」，到加歌頁搜尋'); endVoice(); return;
+      voiceSearchAndPlay(q); return;
     }
   }
   toast('聽不懂：' + txt); endVoice();
+}
+
+async function voiceSearchAndPlay(q) {
+  if (!State.settings.ytKey) {
+    toast('歌單沒有「' + q + '」，且未設定 YouTube API Key');
+    endVoice(); return;
+  }
+  $('#voice-text').textContent = '搜尋 YouTube：' + q + '…';
+  try {
+    const items = await searchYouTube(q);
+    if (!items.length) { toast('YouTube 沒搜到「' + q + '」'); endVoice(); return; }
+    const top = items[0];
+    if (State.songs.some(x => x.videoId === top.videoId)) {
+      const exist = State.songs.find(x => x.videoId === top.videoId);
+      playSong(exist.id); toast('▶ ' + exist.title); endVoice(); return;
+    }
+    const local = {
+      id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      title: top.title, artist: top.artist || '', videoId: top.videoId,
+      thumb: top.thumb, dur:'', addedAt: new Date().toISOString(),
+      tag:'', playCount:0, lastPlay:'', lrc:'', note:''
+    };
+    State.songs.unshift(local);
+    saveSongsLocal();
+    renderLibrary();
+    if (State.settings.gasUrl) {
+      gas('addSong', {
+        '歌名': local.title, '歌手': local.artist, 'YouTubeID': local.videoId,
+        '縮圖': local.thumb, '時長': local.dur
+      }).then(r => {
+        if (r && r.ok && r.id) { local.id = r.id; saveSongsLocal(); renderLibrary(); }
+      }).catch(()=>{});
+    }
+    playSong(local.id);
+    toast('▶ ' + top.title);
+    endVoice();
+  } catch (e) {
+    toast('搜尋失敗：' + (e.message || e));
+    endVoice();
+  }
 }
 
 //-------------- Page nav --------------
