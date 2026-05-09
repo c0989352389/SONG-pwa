@@ -236,14 +236,15 @@ body.mode-lyrics #np-vis{display:none}
 .song-row:hover{background:rgba(255,255,255,.09);border-color:var(--glass-st)}
 .song-row.playing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px color-mix(in srgb, var(--accent) 25%, transparent)}
 .song-row.dragging{opacity:.4}
-.song-row .drag-h{color:var(--text3);font-size:14px;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-2px}
-.song-row .drag-h:active{cursor:grabbing}
+.song-row .drag-h{color:var(--text3);font-size:18px;cursor:grab;padding:10px 8px;user-select:none;letter-spacing:-3px;touch-action:none;flex-shrink:0;min-width:32px;text-align:center}
+.song-row .drag-h:active{cursor:grabbing;color:var(--accent)}
 .pl-tab.drop-target{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;transform:scale(1.06)}
 .result-row{display:block;margin-bottom:8px}
 .result-main{display:flex;align-items:center;gap:9px}
-.result-main img{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0}
-.result-main .song-info{flex:0 1 50%;min-width:0;max-width:50%;overflow:hidden}
-.result-main .song-title{white-space:nowrap;overflow:hidden;font-size:13px;font-weight:600}
+.result-main img{width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.result-main .song-info{flex:0 1 33%;min-width:0;max-width:33%;overflow:hidden}
+.result-main .song-title{white-space:nowrap;overflow:hidden;font-size:12.5px;font-weight:600}
+.result-main .preview-btn,.result-main button[data-vid]{flex:0 0 auto;padding:7px 10px;font-size:13px}
 .result-main .song-title .mq{display:inline-block;padding-left:100%;animation:song-marquee 14s linear infinite}
 .result-main .song-title:not(.is-long) .mq{padding-left:0;animation:none}
 .result-main .song-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--text2)}
@@ -1861,6 +1862,12 @@ function visibleSongs() {
   if (pid !== 'all') {
     arr = arr.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(pid));
     arr = arr.slice().sort((a,b) => _orderKey(a, pid) - _orderKey(b, pid));
+  } else {
+    // 全部視圖:有設過 __all__ 排序就照,沒設的依加入時間倒序排在後面
+    const hasAny = arr.some(s => s.orderInPl && typeof s.orderInPl.__all__ === 'number');
+    if (hasAny) {
+      arr = arr.slice().sort((a,b) => _orderKey(a, '__all__') - _orderKey(b, '__all__'));
+    }
   }
   return arr;
 }
@@ -1943,10 +1950,12 @@ function renderLibrary(filter='') {
   if (State.libPage < 0) State.libPage = 0;
   const start = State.libPage * LIB_PAGE_SIZE;
   const items = all.slice(start, start + LIB_PAGE_SIZE);
+  // 任何篩選都可拖排(全部/各歌單/語言性別過濾下都允許)
+  const sortable = !q;
   const isInPl = State.currentPlaylistId !== 'all' && !q;
   list.innerHTML = items.map(s => `
     <div class="song-row ${s.id === State.currentId ? 'playing' : ''}" data-id="${s.id}" draggable="true">
-      ${isInPl ? '<span class="drag-h" title="拖曳排序">⋮⋮</span>' : ''}
+      ${sortable ? '<span class="drag-h" title="按住拖曳排序">⋮⋮</span>' : ''}
       <img src="${s.thumb || ''}" alt="" loading="lazy" onerror="this.style.opacity='.2'">
       <div class="song-info">
         <div class="song-title">${escapeHtml(s.title || '(未命名)')}</div>
@@ -1984,19 +1993,24 @@ function renderLibrary(filter='') {
   const next = list.querySelector('#lib-next'); if (next) next.onclick = () => { State.libPage++; renderLibrary(); };
   // 在特定歌單時啟用拖曳排序
   if (_sortableInst) { try { _sortableInst.destroy(); } catch(_){} _sortableInst = null; }
-  if (isInPl && window.Sortable) {
+  if (sortable && window.Sortable) {
     _sortableInst = window.Sortable.create(list, {
       animation: 150,
       handle: '.drag-h',
       filter: 'button, [data-act]',
       preventOnFilter: false,
+      // 行動裝置:長按 150ms 才開始拖,避免和滾動衝突
+      delay: 150,
+      delayOnTouchOnly: true,
+      touchStartThreshold: 5,
+      forceFallback: true,        // 自繪 ghost,讓手機觸控更穩
+      fallbackTolerance: 5,
       onEnd: () => _persistOrderFromDom(),
     });
   }
 }
 function _persistOrderFromDom() {
-  const pid = State.currentPlaylistId;
-  if (pid === 'all') return;
+  const pid = State.currentPlaylistId === 'all' ? '__all__' : State.currentPlaylistId;
   const list = $('#lib-list');
   const rows = Array.from(list.querySelectorAll('.song-row[data-id]'));
   const start = State.libPage * LIB_PAGE_SIZE;
@@ -2007,10 +2021,11 @@ function _persistOrderFromDom() {
     s.orderInPl[pid] = start + i;
   });
   saveSongsLocal();
-  rows.forEach(row => {
+  // 限速 push,避免一次大量同步打爆 GAS
+  rows.forEach((row, i) => setTimeout(() => {
     const s = State.songs.find(x => x.id === row.dataset.id);
     if (s) pushSongToCloud(s);
-  });
+  }, i * 200));
 }
 function openSongSheet(id) {
   const s = State.songs.find(x => x.id === id); if (!s) return;
