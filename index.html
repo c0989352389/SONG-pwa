@@ -239,6 +239,11 @@ body.mode-lyrics #np-vis{display:none}
 .song-row .drag-h{color:var(--text3);font-size:14px;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-2px}
 .song-row .drag-h:active{cursor:grabbing}
 .pl-tab.drop-target{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;transform:scale(1.06)}
+.lyr-box.tap-sync .lyr-line{cursor:pointer;border-left:3px solid transparent;padding-left:8px;transition:all .12s}
+.lyr-box.tap-sync .lyr-line:hover{background:rgba(255,255,255,.08);border-left-color:var(--accent)}
+.tap-tag{margin-left:8px;font-size:11px;color:var(--accent2);background:rgba(0,0,0,.25);padding:1px 6px;border-radius:8px;font-family:ui-monospace,monospace}
+.tap-sync-bar{position:fixed;left:50%;bottom:calc(var(--nav-h,72px) + 14px);transform:translateX(-50%);z-index:200;display:flex;gap:8px;align-items:center;background:rgba(20,20,28,.92);backdrop-filter:blur(14px);border:1px solid var(--glass-br);border-radius:24px;padding:8px 14px;box-shadow:0 12px 40px rgba(0,0,0,.6);max-width:96vw;flex-wrap:wrap;justify-content:center}
+.tap-sync-bar .tsb-info{font-size:12px;color:var(--text2);font-family:ui-monospace,monospace;padding:0 6px}
 .artist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
 .artist-card{background:var(--glass);border:1px solid var(--glass-br);border-radius:14px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .18s;font-size:13px;font-weight:600;color:var(--text);position:relative;overflow:hidden}
 .artist-card:hover{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 24%,var(--glass)),color-mix(in srgb,var(--accent2) 24%,var(--glass)));border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 30%,transparent)}
@@ -449,6 +454,7 @@ body.mode-lyrics #np-vis{display:none}
             <button class="btn dim" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">⏩ 晚0.5s</button>
             <button class="btn dim" id="btn-lrc-reset" title="重設偏移">重設</button>
             <button class="btn" id="btn-lrc-calib" title="點當下歌詞自動校正">🎯 點句校正</button>
+            <button class="btn" id="btn-lrc-tap" title="逐句打點:邊聽邊點每行設時間">🎵 逐句打點</button>
             <button class="btn danger" id="btn-lrc-wrong" title="標記歌詞錯誤,用修正後的歌名重找">🚫 報錯</button>
           </div>
         </div>
@@ -560,11 +566,15 @@ body.mode-lyrics #np-vis{display:none}
   <!-- LRC editor -->
   <div class="modal" id="modal-lrc">
     <div class="modal-card">
-      <div class="modal-h"><h3>📝 編輯歌詞</h3><button class="gb" data-close>✕</button></div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">支援 LRC 時間軸格式 <code>[mm:ss.xx]歌詞</code>，或純文字</div>
-      <textarea id="lrc-input" placeholder="[00:12.50]第一句歌詞&#10;[00:18.00]第二句歌詞"></textarea>
+      <div class="modal-h"><h3>📝 編輯/貼上歌詞</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
+        支援 LRC 時間軸格式 <code>[mm:ss.xx]歌詞</code>,或純文字逐行貼上。<br>
+        貼純文字後可按下方「🎵 儲存並逐句打點」邊聽邊點每行設定時間。
+      </div>
+      <textarea id="lrc-input" placeholder="把整首歌詞貼進來,一句一行&#10;[00:12.50]第一句歌詞&#10;[00:18.00]第二句歌詞"></textarea>
       <div class="modal-foot">
         <button class="btn dim" data-close>取消</button>
+        <button class="btn" id="btn-save-lrc-tap">🎵 儲存並逐句打點</button>
         <button class="btn pri" id="btn-save-lrc">儲存歌詞</button>
       </div>
     </div>
@@ -1560,11 +1570,114 @@ function renderLyrics() {
   box.querySelectorAll('.lyr-line').forEach(el => {
     el.addEventListener('click', () => {
       const i = +el.dataset.i;
+      if (State.tapSyncMode) { tapSyncAt(i); return; }
       if (State.lrcCalibMode) { calibrateAt(i); return; }
       const t = +el.dataset.t;
       if (t >= 0 && State.player && State.player.seekTo) State.player.seekTo(t, true);
     });
   });
+  // tap-sync 顯示時間標記
+  if (State.tapSyncMode) {
+    box.classList.add('tap-sync');
+    box.querySelectorAll('.lyr-line').forEach(el => {
+      const t = +el.dataset.t;
+      if (t >= 0) {
+        const tag = document.createElement('span');
+        tag.className = 'tap-tag';
+        tag.textContent = '⏱ ' + fmt(t);
+        el.firstElementChild.appendChild(tag);
+      }
+    });
+  } else {
+    box.classList.remove('tap-sync');
+  }
+}
+// ===== Tap-sync 逐句打點 =====
+function toggleTapSync() {
+  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
+  if (!State.lyrics.length) { toast('沒有歌詞,先用「📝 編輯」貼上'); return; }
+  State.tapSyncMode = !State.tapSyncMode;
+  $('#btn-lrc-tap').classList.toggle('on', State.tapSyncMode);
+  if (State.tapSyncMode) {
+    State.lrcCalibMode = false;
+    $('#btn-lrc-calib').classList.remove('on');
+    $('#lyr-box').classList.remove('calib');
+    toast('🎵 逐句打點:邊聽邊點每行,點到誰就把當下時間設給誰', 4500);
+    showTapSyncBar();
+  } else {
+    hideTapSyncBar();
+  }
+  renderLyrics();
+}
+function tapSyncAt(i) {
+  if (!State.player || !State.player.getCurrentTime) return;
+  const now = State.player.getCurrentTime() || 0;
+  State.lyrics[i].t = Math.round(now * 100) / 100;
+  // 不重排,維持貼上的順序
+  const total = State.lyrics.length;
+  const done = State.lyrics.filter(x => x.t >= 0).length;
+  renderLyrics();
+  updateTapSyncBar(done, total);
+}
+function showTapSyncBar() {
+  if ($('#tap-sync-bar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'tap-sync-bar';
+  bar.className = 'tap-sync-bar';
+  document.body.appendChild(bar);
+  const total = State.lyrics.length;
+  const done = State.lyrics.filter(x => x.t >= 0).length;
+  bar.innerHTML = `
+    <div class="tsb-info"><span id="tsb-done">${done}</span> / <span>${total}</span> 已打點</div>
+    <button class="btn dim sm" id="tsb-undo">↶ 撤銷上一行</button>
+    <button class="btn dim sm" id="tsb-clear">清空時間</button>
+    <button class="btn pri sm" id="tsb-save">✅ 完成並儲存</button>
+    <button class="btn dim sm" id="tsb-cancel">取消</button>`;
+  bar.querySelector('#tsb-undo').onclick = tapSyncUndo;
+  bar.querySelector('#tsb-clear').onclick = tapSyncClearTimes;
+  bar.querySelector('#tsb-save').onclick = tapSyncFinish;
+  bar.querySelector('#tsb-cancel').onclick = () => { State.tapSyncMode = false; $('#btn-lrc-tap').classList.remove('on'); hideTapSyncBar(); renderLyrics(); };
+}
+function hideTapSyncBar() {
+  const bar = $('#tap-sync-bar'); if (bar) bar.remove();
+}
+function updateTapSyncBar(done, total) {
+  const el = $('#tsb-done'); if (el) el.textContent = done;
+}
+let _tapHistory = [];
+function tapSyncUndo() {
+  // 找最後一個 t>=0 的依時間倒序還原為 -1
+  const idxes = State.lyrics.map((l,i) => ({ l, i })).filter(x => x.l.t >= 0);
+  if (!idxes.length) return;
+  idxes.sort((a,b) => b.l.t - a.l.t);
+  idxes[0].l.t = -1;
+  const total = State.lyrics.length;
+  const done = State.lyrics.filter(x => x.t >= 0).length;
+  renderLyrics(); updateTapSyncBar(done, total);
+}
+function tapSyncClearTimes() {
+  if (!confirm('清空所有時間軸?歌詞文字會保留')) return;
+  State.lyrics.forEach(l => l.t = -1);
+  renderLyrics(); updateTapSyncBar(0, State.lyrics.length);
+}
+function tapSyncFinish() {
+  const s = getCur(); if (!s) return;
+  // 依時間排序但保留沒打點的(放後面)
+  const timed = State.lyrics.filter(l => l.t >= 0).sort((a,b) => a.t - b.t);
+  const untimed = State.lyrics.filter(l => l.t < 0);
+  const ordered = timed.concat(untimed);
+  const lrcStr = ordered.map(l => l.t >= 0 ? `[${_fmtLrcStamp(l.t)}]${l.text}` : l.text).join('\n');
+  s.lrc = lrcStr; saveSongsLocal(); pushSongToCloud(s);
+  State.tapSyncMode = false;
+  $('#btn-lrc-tap').classList.remove('on');
+  hideTapSyncBar();
+  parseLyrics(lrcStr);
+  toast('已儲存 ' + timed.length + ' 行時間軸');
+}
+function _fmtLrcStamp(t) {
+  const m = Math.floor(t / 60);
+  const s = (t - m * 60).toFixed(2);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(5, '0');
 }
 function syncLyric(t) {
   if (!State.lyrics.length) return;
@@ -2619,6 +2732,19 @@ function bind() {
     const s = getCur(); if (s) { s.lrc = lrc; saveSongsLocal(); parseLyrics(lrc); pushSongToCloud(s); }
     $('#modal-lrc').classList.remove('show'); toast('歌詞已儲存');
   });
+  $('#btn-save-lrc-tap').addEventListener('click', () => {
+    if (!State.currentId) return;
+    const lrc = $('#lrc-input').value;
+    const s = getCur(); if (!s) return;
+    s.lrc = lrc; saveSongsLocal(); parseLyrics(lrc); pushSongToCloud(s);
+    $('#modal-lrc').classList.remove('show');
+    setTimeout(() => {
+      State.tapSyncMode = false; // 確保由 toggleTapSync 開啟
+      toggleTapSync();
+      try { State.player && State.player.playVideo && State.player.playVideo(); } catch(_){}
+    }, 200);
+  });
+  $('#btn-lrc-tap').addEventListener('click', toggleTapSync);
 
   $('#btn-pl-create').addEventListener('click', createPlaylist);
   $('#pl-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createPlaylist(); });
