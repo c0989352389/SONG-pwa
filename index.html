@@ -242,9 +242,10 @@ body.mode-lyrics #np-vis{display:none}
 .result-row{display:block;margin-bottom:8px}
 .result-main{display:flex;align-items:center;gap:9px}
 .result-main img{width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0}
-.result-main .song-info{flex:0 1 33%;min-width:0;max-width:33%;overflow:hidden}
+.result-main .song-info{flex:0 0 84px;width:84px;max-width:84px;overflow:hidden}
 .result-main .song-title{white-space:nowrap;overflow:hidden;font-size:12.5px;font-weight:600}
-.result-main .preview-btn,.result-main button[data-vid]{flex:0 0 auto;padding:7px 10px;font-size:13px}
+.result-main .result-actions{margin-left:auto;display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:stretch}
+.result-main .result-actions .btn{padding:5px 12px;font-size:12px;min-width:60px}
 .result-main .song-title .mq{display:inline-block;padding-left:100%;animation:song-marquee 14s linear infinite}
 .result-main .song-title:not(.is-long) .mq{padding-left:0;animation:none}
 .result-main .song-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--text2)}
@@ -1933,25 +1934,7 @@ function renderPlaylistTabs() {
     });
   });
   $('#btn-pl-mgr').addEventListener('click', openPlMgr);
-  // 拖曳重排歌單 tab(僅排序自訂歌單,「全部」與「+ 管理」不動)
-  if (window.Sortable) {
-    if (tabs._sortable) try { tabs._sortable.destroy(); } catch(_){}
-    tabs._sortable = window.Sortable.create(tabs, {
-      animation: 150,
-      filter: '[data-id="all"], #btn-pl-mgr',
-      preventOnFilter: false,
-      delay: 200, delayOnTouchOnly: true, touchStartThreshold: 5,
-      forceFallback: true, fallbackTolerance: 5,
-      onEnd: () => {
-        const order = Array.from(tabs.querySelectorAll('[data-id]')).map(b => b.dataset.id).filter(id => id !== 'all');
-        order.forEach((id, i) => { const p = State.playlists.find(x => x.id === id); if (p) p.sortOrder = i; });
-        savePlaylistsLocal();
-        if (State.settings.gasUrl) {
-          State.playlists.forEach((p, i) => setTimeout(() => gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder||0, '顏色': p.color || '' }).catch(()=>{}), i * 200));
-        }
-      }
-    });
-  }
+  if (tabs._sortable) { try { tabs._sortable.destroy(); } catch(_){} tabs._sortable = null; }
 }
 function renderLibrary(filter='') {
   const list = $('#lib-list');
@@ -2225,11 +2208,30 @@ function openPlMgr() {
   $('#pl-mgr').innerHTML = pls.length ? pls.map(p => {
     const count = State.songs.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(p.id)).length;
     return `<div class="sec-row" data-pid="${p.id}" style="margin-bottom:6px">
+      <span class="drag-h" style="cursor:grab;color:var(--text3);padding:8px;font-size:18px;letter-spacing:-3px;user-select:none;touch-action:none">⋮⋮</span>
       <input type="text" data-k="name" value="${escapeHtml(p.name)}" style="flex:1">
       <span style="font-size:12px;color:var(--text3);min-width:50px;text-align:right">${count} 首</span>
       <button class="x" data-del-pl="${p.id}" title="刪除">✕</button>
     </div>`;
   }).join('') : '<div class="lyr-empty" style="padding:14px 0">尚無分類,在下方建立第一個</div>';
+  // 啟用上下拖曳排序
+  if (window.Sortable && pls.length) {
+    const mgr = $('#pl-mgr');
+    if (mgr._sort) try { mgr._sort.destroy(); } catch(_){}
+    mgr._sort = window.Sortable.create(mgr, {
+      animation: 150, handle: '.drag-h',
+      delay: 150, delayOnTouchOnly: true, touchStartThreshold: 5,
+      forceFallback: true, fallbackTolerance: 5,
+      onEnd: () => {
+        const ids = Array.from(mgr.querySelectorAll('[data-pid]')).map(r => r.dataset.pid);
+        ids.forEach((id, i) => { const p = State.playlists.find(x => x.id === id); if (p) p.sortOrder = i; });
+        savePlaylistsLocal(); renderPlaylistTabs();
+        if (State.settings.gasUrl) {
+          State.playlists.forEach((p, i) => setTimeout(() => gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder||0, '顏色': p.color || '' }).catch(()=>{}), i * 200));
+        }
+      }
+    });
+  }
   $('#pl-mgr').querySelectorAll('[data-pid]').forEach(row => {
     row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
       const pid = row.dataset.pid;
@@ -2309,8 +2311,10 @@ function _renderYTRow(it, existingVids) {
         <div class="song-title"><span class="mq">${escapeHtml(it.title)}</span></div>
         <div class="song-meta">${escapeHtml(it.artist)}${dup ? ' <span class="song-tag">已收藏</span>' : ''}</div>
       </div>
-      <button class="btn dim sm preview-btn" data-prev="${it.videoId}" title="試聽副歌約 30 秒">🔊</button>
-      <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}" ${dup?'disabled':''}>${dup?'✓':'＋'}</button>
+      <div class="result-actions">
+        <button class="btn dim preview-btn" data-prev="${it.videoId}" title="試聽副歌約 30 秒">🔊 試聽</button>
+        <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}" ${dup?'disabled':''}>${dup?'✓ 已收':'＋ 加歌'}</button>
+      </div>
     </div>
     <div class="preview-slot"></div>
   </div>`;
