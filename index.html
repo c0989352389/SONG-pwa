@@ -508,11 +508,10 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 
     <section class="page" id="page-add">
       <div class="search-tabs">
-        <button class="active" data-tab="recommend">✨ 推薦</button>
-        <button data-tab="search">🔍 搜尋</button>
-        <button data-tab="url">🔗 網址</button>
+        <button class="active" data-tab="search">🔍 搜尋</button>
+        <button data-tab="recommend">✨ 推薦</button>
       </div>
-      <div id="tab-recommend">
+      <div id="tab-recommend" style="display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div style="font-size:12px;color:var(--text2);line-height:1.6">熱門歌手 Top 20,點擊直接搜尋</div>
           <button class="btn dim sm" id="btn-refresh-artists" title="重新整理">⟳</button>
@@ -529,23 +528,14 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
           <div class="results" id="rec-results"></div>
         </details>
       </div>
-      <div id="tab-search" style="display:none">
+      <div id="tab-search">
         <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="text" id="yt-q" placeholder="輸入歌名 / 歌手關鍵字" style="flex:1">
+          <input type="text" id="yt-q" placeholder="輸入歌名 / 歌手關鍵字 或 YouTube 網址" style="flex:1">
           <button class="btn pri" id="btn-yt-search">搜尋</button>
         </div>
         <div class="results" id="yt-results">
           <div class="empty"><div class="empty-i">🔍</div><div class="empty-t">輸入關鍵字直接搜 YouTube</div></div>
         </div>
-      </div>
-      <div id="tab-url" style="display:none">
-        <label>YouTube 網址或影片 ID</label>
-        <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=...">
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <input type="text" id="url-title" placeholder="歌名（選填，會自動抓取）" style="flex:2">
-          <input type="text" id="url-artist" placeholder="歌手" style="flex:1">
-        </div>
-        <button class="btn pri" id="btn-add-url" style="margin-top:10px;width:100%">加入歌單</button>
       </div>
     </section>
   </main>
@@ -2715,7 +2705,6 @@ async function loadHotArtists(force) {
     $$('.search-tabs button').forEach(x => x.classList.toggle('active', x.dataset.tab === 'search'));
     $('#tab-recommend').style.display = 'none';
     $('#tab-search').style.display = '';
-    $('#tab-url').style.display = 'none';
     $('#yt-q').value = name;
     $('#btn-yt-search').click();
   }));
@@ -3064,7 +3053,6 @@ function bind() {
     $$('.search-tabs button').forEach(x => x.classList.toggle('active', x === b));
     $('#tab-recommend').style.display = b.dataset.tab === 'recommend' ? '' : 'none';
     $('#tab-search').style.display = b.dataset.tab === 'search' ? '' : 'none';
-    $('#tab-url').style.display = b.dataset.tab === 'url' ? '' : 'none';
     if (b.dataset.tab === 'recommend' && !$('#hot-artists').dataset.loaded) {
       $('#hot-artists').dataset.loaded = '1';
       loadHotArtists(false);
@@ -3075,6 +3063,17 @@ function bind() {
   $('#rec-seed').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-load-rec').click(); });
   $('#btn-yt-search').addEventListener('click', async () => {
     const q = $('#yt-q').value.trim(); if (!q) return;
+    // 自動偵測:輸入是 YouTube 網址或影片 ID → 直接加入
+    const vid = ytIdFromUrl(q);
+    if (vid) {
+      try {
+        const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vid}&format=json`);
+        const j = r.ok ? await r.json() : {};
+        await addSong({ videoId: vid, title: j.title || vid, artist: j.author_name || '', thumb: `https://i.ytimg.com/vi/${vid}/mqdefault.jpg` });
+        $('#yt-q').value = '';
+      } catch(_) { toast('加入失敗'); }
+      return;
+    }
     const list = $('#yt-results');
     list.innerHTML = '<div class="empty"><div class="empty-t"><span class="spinner"></span> 搜尋中…</div></div>';
     let items = [];
@@ -3087,7 +3086,7 @@ function bind() {
     _renderYTPage();
   });
   $('#yt-q').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-yt-search').click(); });
-  $('#btn-add-url').addEventListener('click', addByUrl);
+  // (URL tab 已移除,YT 搜尋框會自動偵測網址)
 
   $('#btn-settings').addEventListener('click', () => {
     $('#set-yt-key').value = State.settings.ytKey || '';
