@@ -241,6 +241,14 @@ body.mode-lyrics #np-vis{display:none}
 .pl-tab.drop-target{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;transform:scale(1.06)}
 .result-row{display:block;margin-bottom:8px}
 .result-main{display:flex;align-items:center;gap:9px}
+.result-main img{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.result-main .song-info{flex:0 1 50%;min-width:0;max-width:50%;overflow:hidden}
+.result-main .song-title{white-space:nowrap;overflow:hidden;font-size:13px;font-weight:600}
+.result-main .song-title .mq{display:inline-block;padding-left:100%;animation:song-marquee 14s linear infinite}
+.result-main .song-title:not(.is-long) .mq{padding-left:0;animation:none}
+.result-main .song-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--text2)}
+.result-main .preview-btn,.result-main button[data-vid]{flex-shrink:0}
+@keyframes song-marquee{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
 .preview-btn.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
 .preview-frame{margin-top:8px;border-radius:10px;overflow:hidden;background:#000}
 .preview-tip{font-size:11px;color:var(--text3);padding:6px 8px;text-align:center}
@@ -2264,7 +2272,7 @@ function _renderYTRow(it, existingVids) {
     <div class="result-main">
       <img src="${it.thumb}" alt="">
       <div class="song-info">
-        <div class="song-title">${escapeHtml(it.title)}</div>
+        <div class="song-title"><span class="mq">${escapeHtml(it.title)}</span></div>
         <div class="song-meta">${escapeHtml(it.artist)}${dup ? ' <span class="song-tag">已收藏</span>' : ''}</div>
       </div>
       <button class="btn dim sm preview-btn" data-prev="${it.videoId}" title="試聽副歌約 30 秒">🔊</button>
@@ -2274,6 +2282,12 @@ function _renderYTRow(it, existingVids) {
   </div>`;
 }
 function _bindYTRowButtons(list) {
+  // 量測哪些標題真的超出 → 啟用跑馬燈
+  list.querySelectorAll('.song-title:not(.is-checked)').forEach(t => {
+    t.classList.add('is-checked');
+    const inner = t.querySelector('.mq');
+    if (inner && inner.scrollWidth > t.clientWidth + 4) t.classList.add('is-long');
+  });
   list.querySelectorAll('button[data-vid]:not([data-bound])').forEach(b => {
     b.setAttribute('data-bound','1');
     b.addEventListener('click', async () => {
