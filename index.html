@@ -172,7 +172,11 @@ body.mode-lyrics #np-vis{display:none}
 }
 .np-art.playing .vinyl-arm{transform:rotate(-6deg)}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent)}50%{box-shadow:0 0 0 14px transparent}}
-.np-title{font-size:20px;font-weight:600;text-align:center;margin-bottom:4px;line-height:1.3;padding:0 8px;word-break:break-word}
+.np-title-wrap{position:relative;margin-bottom:4px;overflow:hidden;border-radius:14px;padding:8px 0;background:radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 75%);box-shadow:inset 0 0 30px color-mix(in srgb, var(--accent2) 15%, transparent),0 0 24px color-mix(in srgb, var(--accent) 25%, transparent)}
+.np-title{font-size:20px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-shadow:0 0 12px color-mix(in srgb, var(--accent) 60%, transparent)}
+.np-title .np-mq{display:inline-block;padding-left:100%;animation:np-marquee 14s linear infinite}
+.np-title.is-short .np-mq{padding-left:0;animation:none;display:block;text-align:center}
+@keyframes np-marquee{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
 .np-artist{font-size:13px;color:var(--text2);text-align:center;margin-bottom:18px}
 .np-prog{padding:0 6px;margin-bottom:14px}
 .np-bar{height:8px;background:rgba(255,255,255,.1);border-radius:4px;position:relative;cursor:pointer;touch-action:none;padding:8px 0;margin:-8px 0;overflow:visible}
@@ -398,13 +402,8 @@ body.mode-lyrics #np-vis{display:none}
           </svg>
           <span class="empty-label">♪</span>
         </div>
-        <div class="np-title" id="np-title">尚未選曲</div>
+        <div class="np-title-wrap"><div class="np-title" id="np-title"><span class="np-mq">尚未選曲</span></div></div>
         <div class="np-artist" id="np-artist">點下方收藏選一首，或到「加歌」搜尋</div>
-        <div style="text-align:center;margin-bottom:14px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
-          <button class="btn sm" id="btn-current-pl" style="border-radius:18px">＋ 加入歌單分組</button>
-          <button class="btn sm dim" id="btn-edit-song" style="border-radius:18px">✏ 編輯名稱</button>
-          <button class="btn sm danger" id="btn-del-song" style="border-radius:18px">🗑 刪除</button>
-        </div>
 
         <div class="np-prog">
           <div class="np-bar" id="np-bar">
@@ -1324,13 +1323,29 @@ function startProgress() {
 function stopProgress() { if (State.progressTimer) { clearInterval(State.progressTimer); State.progressTimer = null; } }
 
 function getCur() { return State.songs.find(s => s.id === State.currentId); }
+function setNpTitle(text) {
+  const t = $('#np-title');
+  if (!t) return;
+  t.innerHTML = `<span class="np-mq">${escapeHtml(text || '')}</span>`;
+  // 量測:文字寬度小於容器 → 不跑馬
+  requestAnimationFrame(() => {
+    const inner = t.querySelector('.np-mq');
+    if (!inner) return;
+    // 暫時取消 padding-left:100% 量測自然寬度
+    inner.style.paddingLeft = '0';
+    const innerW = inner.scrollWidth;
+    inner.style.paddingLeft = '';
+    if (innerW <= t.clientWidth + 4) t.classList.add('is-short');
+    else t.classList.remove('is-short');
+  });
+}
 
 function playSong(id) {
   const s = State.songs.find(x => x.id === id);
   if (!s) return;
   State.currentId = id;
   localStorage.setItem(LS.current, id);
-  $('#np-title').textContent = s.title || '(未命名)';
+  setNpTitle(s.title || '(未命名)');
   $('#np-artist').textContent = s.artist || '';
   const art = $('#np-art');
   art.classList.remove('empty');
@@ -1465,7 +1480,7 @@ async function autoFallback(s) {
   if (alt.title) s.title = alt.title;
   if (alt.artist) s.artist = alt.artist;
   saveSongsLocal(); pushSongToCloud(s);
-  $('#np-title').textContent = s.title;
+  setNpTitle(s.title);
   $('#np-artist').textContent = s.artist || '';
   $('#vinyl-art').style.backgroundImage = `url('${s.thumb}')`;
   toast('已換版本: ' + (alt.title || ''));
@@ -2122,7 +2137,7 @@ async function deleteSong(id) {
   if (wasCur) {
     State.currentId = null;
     try { State.player && State.player.stopVideo && State.player.stopVideo(); } catch(_){}
-    $('#np-title').textContent = '尚未選曲';
+    setNpTitle('尚未選曲');
     $('#np-artist').textContent = '點下方收藏選一首,或到「加歌」搜尋';
   }
   toast('已刪除');
@@ -2193,7 +2208,7 @@ async function saveEditSong() {
   saveSongsLocal();
   pushSongToCloud(s);
   if (State.currentId === s.id) {
-    $('#np-title').textContent = s.title || '(未命名)';
+    setNpTitle(s.title || '(未命名)');
     $('#np-artist').textContent = s.artist || '';
   }
   renderLibrary();
@@ -2798,18 +2813,13 @@ function bind() {
   $('#btn-lrc-calib').addEventListener('click', toggleCalib);
   $('#btn-lrc-wrong').addEventListener('click', reportLyricsWrong);
   $('#btn-wrong-submit').addEventListener('click', submitWrong);
-  $('#btn-current-pl').addEventListener('click', () => {
+  // 點播放頁標題打開歌曲選單(整合原本的加入歌單/編輯/刪除)
+  $('#np-title-wrap')?.addEventListener('click', () => {
     if (!State.currentId) { toast('先選一首歌'); return; }
     openSongSheet(State.currentId);
   });
-  $('#btn-edit-song').addEventListener('click', () => {
-    if (!State.currentId) { toast('先選一首歌'); return; }
-    openEditSong(State.currentId);
-  });
-  $('#btn-del-song').addEventListener('click', () => {
-    if (!State.currentId) { toast('先選一首歌'); return; }
-    deleteSong(State.currentId);
-  });
+  const ntw = document.querySelector('.np-title-wrap');
+  if (ntw) ntw.addEventListener('click', () => { if (State.currentId) openSongSheet(State.currentId); });
   $('#btn-edit-save').addEventListener('click', saveEditSong);
   $('#edit-title').addEventListener('input', _refreshEditWarn);
   $('#edit-artist').addEventListener('input', _refreshEditWarn);
@@ -2986,7 +2996,7 @@ async function init() {
   if (lastId && State.songs.some(s => s.id === lastId)) {
     const s = State.songs.find(x => x.id === lastId);
     State.currentId = lastId;
-    $('#np-title').textContent = s.title || ''; $('#np-artist').textContent = s.artist || '';
+    setNpTitle(s.title || ''); $('#np-artist').textContent = s.artist || '';
     const art = $('#np-art'); art.classList.remove('empty');
     $('#vinyl-art').style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
     parseLyrics(s.lrc || '');
