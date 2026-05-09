@@ -239,6 +239,11 @@ body.mode-lyrics #np-vis{display:none}
 .song-row .drag-h{color:var(--text3);font-size:14px;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-2px}
 .song-row .drag-h:active{cursor:grabbing}
 .pl-tab.drop-target{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;transform:scale(1.06)}
+.result-row{display:block;margin-bottom:8px}
+.result-main{display:flex;align-items:center;gap:9px}
+.preview-btn.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.preview-frame{margin-top:8px;border-radius:10px;overflow:hidden;background:#000}
+.preview-tip{font-size:11px;color:var(--text3);padding:6px 8px;text-align:center}
 .lyr-box.tap-sync .lyr-line{cursor:pointer;border-left:3px solid transparent;padding-left:8px;transition:all .12s}
 .lyr-box.tap-sync .lyr-line:hover{background:rgba(255,255,255,.08);border-left-color:var(--accent)}
 .tap-tag{margin-left:8px;font-size:11px;color:var(--accent2);background:rgba(0,0,0,.25);padding:1px 6px;border-radius:8px;font-family:ui-monospace,monospace}
@@ -469,6 +474,8 @@ body.mode-lyrics #np-vis{display:none}
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           </button>
         </div>
+        <div class="pl-tabs" id="lang-tabs"></div>
+        <div class="pl-tabs" id="gender-tabs"></div>
         <div class="pl-tabs" id="pl-tabs"></div>
       </div>
       <div id="lib-list"></div>
@@ -664,7 +671,7 @@ body.mode-lyrics #np-vis{display:none}
 'use strict';
 
 const LS = {
-  songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode', shuffle:'song.shuffle', repeat:'song.repeat'
+  songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode', shuffle:'song.shuffle', repeat:'song.repeat', langF:'song.langF', genderF:'song.genderF'
 };
 const DEFAULT_SETTINGS = { ytKey:'', geminiKey:'', gasUrl:'', lang:'zh-TW' };
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -682,6 +689,8 @@ const State = {
   dragging: false,
   shuffleOn: false,
   repeatMode: 0, // 0=off 1=one 2=playlist
+  langFilter: 'all', // all|國語|台語|英語|日語|韓語|其他
+  genderFilter: 'all', // all|男|女|團體|其他
 };
 
 const $ = s => document.querySelector(s);
@@ -789,6 +798,8 @@ function gasFromCloudSong(s) {
     bpm: Number(s['BPM'])||0,
     lrcOffset: Number(s['歌詞偏移'])||0,
     orderInPl: tryParse(s['歌單內排序JSON']) || {},
+    lang: s['語言'] || '',
+    gender: s['性別'] || '',
   };
 }
 async function syncFromGAS() {
@@ -943,7 +954,8 @@ function pushSongToCloud(s) {
     '翻譯JSON': JSON.stringify(s.translations||{}), '解釋JSON': JSON.stringify(s.explanations||{}),
     '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
     'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0,
-    '歌單內排序JSON': JSON.stringify(s.orderInPl||{})
+    '歌單內排序JSON': JSON.stringify(s.orderInPl||{}),
+    '語言': s.lang || '', '性別': s.gender || ''
   }).catch(e => console.warn('push', e));
 }
 
@@ -1834,11 +1846,43 @@ function _orderKey(s, plId) {
   return (typeof v === 'number') ? v : 999999;
 }
 function visibleSongs() {
-  if (State.currentPlaylistId === 'all') return State.songs;
-  const pid = State.currentPlaylistId;
-  return State.songs
-    .filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(pid))
-    .sort((a,b) => _orderKey(a, pid) - _orderKey(b, pid));
+  const lf = State.langFilter, gf = State.genderFilter, pid = State.currentPlaylistId;
+  let arr = State.songs;
+  if (lf !== 'all') arr = arr.filter(s => (s.lang || '其他') === lf);
+  if (gf !== 'all') arr = arr.filter(s => (s.gender || '其他') === gf);
+  if (pid !== 'all') {
+    arr = arr.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(pid));
+    arr = arr.slice().sort((a,b) => _orderKey(a, pid) - _orderKey(b, pid));
+  }
+  return arr;
+}
+const LANG_OPTIONS = ['all','國語','台語','英語','日語','韓語','其他'];
+const GENDER_OPTIONS = ['all','男','女','團體','其他'];
+function renderClassifyTabs() {
+  // 語言
+  const lt = $('#lang-tabs');
+  lt.innerHTML = LANG_OPTIONS.map(v => {
+    const lbl = v === 'all' ? '🌐 全部語言' : v;
+    return `<button class="pl-tab ${v===State.langFilter?'active':''}" data-lf="${v}">${lbl}</button>`;
+  }).join('');
+  lt.querySelectorAll('[data-lf]').forEach(b => b.onclick = () => {
+    State.langFilter = b.dataset.lf;
+    State.libPage = 0;
+    localStorage.setItem(LS.langF, State.langFilter);
+    renderClassifyTabs(); renderLibrary();
+  });
+  // 性別
+  const gt = $('#gender-tabs');
+  gt.innerHTML = GENDER_OPTIONS.map(v => {
+    const lbl = v === 'all' ? '👥 全部歌手' : (v === '男' ? '♂ 男歌星' : v === '女' ? '♀ 女歌星' : v);
+    return `<button class="pl-tab ${v===State.genderFilter?'active':''}" data-gf="${v}">${lbl}</button>`;
+  }).join('');
+  gt.querySelectorAll('[data-gf]').forEach(b => b.onclick = () => {
+    State.genderFilter = b.dataset.gf;
+    State.libPage = 0;
+    localStorage.setItem(LS.genderF, State.genderFilter);
+    renderClassifyTabs(); renderLibrary();
+  });
 }
 function renderPlaylistTabs() {
   const tabs = $('#pl-tabs');
@@ -1966,8 +2010,18 @@ function openSongSheet(id) {
   const pls = State.playlists.sort((a,b)=>a.sortOrder-b.sortOrder);
   s.playlistIds = s.playlistIds || [];
   $('#sheet-body').innerHTML = `
+    <div style="margin-bottom:12px">
+      <div class="gc-t">語言</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">
+        ${LANG_OPTIONS.filter(v=>v!=='all').map(v => `<span class="chip ${s.lang===v?'active':''}" data-lang="${v}">${v}</span>`).join('')}
+      </div>
+      <div class="gc-t">歌手性別</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">
+        ${GENDER_OPTIONS.filter(v=>v!=='all').map(v => `<span class="chip ${s.gender===v?'active':''}" data-gender="${v}">${v}</span>`).join('')}
+      </div>
+    </div>
     <div style="margin-bottom:14px">
-      <div class="gc-t">所屬歌單（可多選）</div>
+      <div class="gc-t">所屬歌單(可多選)</div>
       <div id="sheet-pls" style="margin-bottom:10px">
         ${pls.length ? pls.map(p => `<span class="chip ${s.playlistIds.includes(p.id)?'active':''}" data-pl="${p.id}">${escapeHtml(p.name)}</span>`).join('') : '<div class="lyr-empty" style="padding:6px 0">尚無歌單分組</div>'}
       </div>
@@ -1982,6 +2036,16 @@ function openSongSheet(id) {
       <button class="btn" data-sheet-act="addtag">標籤</button>
       <button class="btn danger" data-sheet-act="del">刪除</button>
     </div>`;
+  $('#sheet-body').querySelectorAll('[data-lang]').forEach(c => c.addEventListener('click', () => {
+    s.lang = c.dataset.lang;
+    $('#sheet-body').querySelectorAll('[data-lang]').forEach(x => x.classList.toggle('active', x.dataset.lang === s.lang));
+    saveSongsLocal(); pushSongToCloud(s); renderClassifyTabs(); renderLibrary();
+  }));
+  $('#sheet-body').querySelectorAll('[data-gender]').forEach(c => c.addEventListener('click', () => {
+    s.gender = c.dataset.gender;
+    $('#sheet-body').querySelectorAll('[data-gender]').forEach(x => x.classList.toggle('active', x.dataset.gender === s.gender));
+    saveSongsLocal(); pushSongToCloud(s); renderClassifyTabs(); renderLibrary();
+  }));
   $('#sheet-body').querySelectorAll('[data-pl]').forEach(c => c.addEventListener('click', async () => {
     const pid = c.dataset.pl;
     const i = s.playlistIds.indexOf(pid);
@@ -2196,13 +2260,17 @@ async function searchYouTube(q, pageToken) {
 const YT_SEARCH_STATE = { q:'', pages:[], tokens:[''], idx:0, loading:false };
 function _renderYTRow(it, existingVids) {
   const dup = existingVids.has(it.videoId);
-  return `<div class="result-row">
-    <img src="${it.thumb}" alt="">
-    <div class="song-info">
-      <div class="song-title">${escapeHtml(it.title)}</div>
-      <div class="song-meta">${escapeHtml(it.artist)}${dup ? ' <span class="song-tag">已收藏</span>' : ''}</div>
+  return `<div class="result-row" data-row-vid="${it.videoId}">
+    <div class="result-main">
+      <img src="${it.thumb}" alt="">
+      <div class="song-info">
+        <div class="song-title">${escapeHtml(it.title)}</div>
+        <div class="song-meta">${escapeHtml(it.artist)}${dup ? ' <span class="song-tag">已收藏</span>' : ''}</div>
+      </div>
+      <button class="btn dim sm preview-btn" data-prev="${it.videoId}" title="試聽副歌約 30 秒">🔊</button>
+      <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}" ${dup?'disabled':''}>${dup?'✓':'＋'}</button>
     </div>
-    <button class="btn pri" data-vid="${it.videoId}" data-title="${escapeHtml(it.title)}" data-artist="${escapeHtml(it.artist)}" data-thumb="${it.thumb}" ${dup?'disabled':''}>${dup?'✓':'＋'}</button>
+    <div class="preview-slot"></div>
   </div>`;
 }
 function _bindYTRowButtons(list) {
@@ -2214,6 +2282,30 @@ function _bindYTRowButtons(list) {
       b.textContent = '✓';
     });
   });
+  list.querySelectorAll('button[data-prev]:not([data-bound])').forEach(b => {
+    b.setAttribute('data-bound','1');
+    b.addEventListener('click', () => togglePreview(list, b.dataset.prev));
+  });
+}
+let _previewVid = null;
+function togglePreview(list, vid) {
+  // 先關掉其他列的預覽
+  list.querySelectorAll('.preview-slot').forEach(s => { if (s.dataset.vid !== vid) s.innerHTML = ''; });
+  list.querySelectorAll('.preview-btn').forEach(b => { if (b.dataset.prev !== vid) b.classList.remove('on'); });
+  const row = list.querySelector(`.result-row[data-row-vid="${vid}"]`);
+  if (!row) return;
+  const slot = row.querySelector('.preview-slot');
+  const btn = row.querySelector('.preview-btn');
+  if (slot.dataset.vid === vid) {
+    slot.innerHTML = ''; slot.dataset.vid = ''; btn.classList.remove('on'); _previewVid = null;
+    return;
+  }
+  // 取得長度估算副歌位置:沒辦法快速拿到長度,先用固定 60 秒(多數歌曲在 1:00-1:30 進副歌)
+  const start = 60, end = 95;
+  slot.dataset.vid = vid;
+  slot.innerHTML = `<div class="preview-frame"><iframe width="100%" height="200" src="https://www.youtube.com/embed/${vid}?autoplay=1&start=${start}&end=${end}&rel=0&modestbranding=1" allow="autoplay; encrypted-media" allowfullscreen frameborder="0"></iframe><div class="preview-tip">▶ 試聽 ${start}s - ${end}s(假設副歌位置),再點 🔊 關閉</div></div>`;
+  btn.classList.add('on');
+  _previewVid = vid;
 }
 function _renderYTPage() {
   const list = $('#yt-results');
@@ -2250,6 +2342,64 @@ async function ytSearchNext() {
   st.loading = false;
   _renderYTPage();
 }
+// ====== 歌曲自動分類 ======
+const FEMALE_ARTISTS = new Set(['田馥甄','蔡依林','張惠妹','孫燕姿','鄧紫棋','蔡健雅','戴佩妮','梁靜茹','蔡幸娟','江蕙','詹雅雯','陳芳語','艾怡良','袁婭維','黃麗玲','彭佳慧','楊丞琳','徐佳瑩','張韶涵','范瑋琪','王心凌','蕭亞軒','周筆暢','鄧麗君','鳳飛飛','張清芳','王菲','那英','宇多田光','米津玄師(假)','IU','李孝利','BoA','TWICE','BLACKPINK','NewJeans','aespa','Red Velvet','LE SSERAFIM','IVE','Ariana Grande','Taylor Swift','Adele','Billie Eilish','Olivia Rodrigo','Dua Lipa','Lady Gaga']);
+const MALE_ARTISTS = new Set(['周杰倫','五月天','林俊傑','陳奕迅','蕭敬騰','韋禮安','周興哲','張學友','劉德華','王力宏','羅志祥','蘇打綠','吳青峰','張震嶽','伍佰','江志豐','黃乙玲(?男?)','陳零九','JJ Lin','米津玄師','BTS Jin','Bruno Mars','Ed Sheeran','The Weeknd','Justin Bieber','Charlie Puth','Shawn Mendes','Post Malone']);
+const GROUP_ARTISTS = new Set(['五月天','蘇打綠','八三夭','茄子蛋','告五人','頑童MJ116','玖壹壹','MAYDAY','BTS','BLACKPINK','TWICE','NewJeans','aespa','SEVENTEEN','Stray Kids','LE SSERAFIM','IVE','Red Velvet','EXO','TXT','ENHYPEN','ITZY','GOT7','NCT','Coldplay','Maroon 5','Imagine Dragons','OneRepublic']);
+function _heuristicClassify(title, artist) {
+  const t = (title || '') + ' ' + (artist || '');
+  let lang = '';
+  if (/[぀-ゟ゠-ヿ]/.test(t)) lang = '日語';
+  else if (/[가-힯]/.test(t)) lang = '韓語';
+  else if (/[一-鿿]/.test(t)) lang = '國語';
+  else if (/[A-Za-z]/.test(t)) lang = '英語';
+  else lang = '其他';
+  let gender = '';
+  const a = (artist || '').trim();
+  if (GROUP_ARTISTS.has(a)) gender = '團體';
+  else if (FEMALE_ARTISTS.has(a)) gender = '女';
+  else if (MALE_ARTISTS.has(a)) gender = '男';
+  else gender = '其他';
+  return { lang, gender };
+}
+async function _aiClassify(title, artist) {
+  if (!State.settings.geminiKey || _geminiCooldownLeft() > 0) return null;
+  const prompt = `判斷這首歌的「語言」和「演唱者性別」。
+歌名:${title}
+歌手:${artist || '(未知)'}
+
+僅回傳 JSON,格式: {"lang":"...","gender":"..."}
+- lang 必為下列之一: 國語/台語/英語/日語/韓語/其他
+- gender 必為下列之一: 男/女/團體/其他
+不要 markdown 程式碼框,只給純 JSON。`;
+  try {
+    const text = await gemini(prompt, { temp: 0.2, max: 100 });
+    const m = String(text).match(/\{[^}]*\}/);
+    if (!m) return null;
+    const j = JSON.parse(m[0].replace(/[""]/g,'"'));
+    if (!['國語','台語','英語','日語','韓語','其他'].includes(j.lang)) j.lang = '其他';
+    if (!['男','女','團體','其他'].includes(j.gender)) j.gender = '其他';
+    return j;
+  } catch(e){ console.warn('ai classify', e); return null; }
+}
+async function autoClassify(s, force) {
+  if (!s) return;
+  if (!force && s.lang && s.gender) return;
+  // 先用啟發式立即填,再用 AI 校正
+  const heur = _heuristicClassify(s.title, s.artist);
+  if (!s.lang) s.lang = heur.lang;
+  if (!s.gender) s.gender = heur.gender;
+  saveSongsLocal();
+  const ai = await _aiClassify(s.title, s.artist);
+  if (ai) {
+    s.lang = ai.lang; s.gender = ai.gender;
+    saveSongsLocal(); pushSongToCloud(s);
+    if (State.currentId === s.id) renderClassifyTabs();
+  } else {
+    pushSongToCloud(s);
+  }
+}
+
 async function addSong(s) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
   // 只有「同歌手 + 同歌名」才算真正衝突,跳 prompt 讓使用者區分;不同歌手直接加入
@@ -2267,7 +2417,9 @@ async function addSong(s) {
     lrc:'', note:'', translations:{}, explanations:{}, sections:[],
     playlistIds: State.currentPlaylistId === 'all' ? [] : [State.currentPlaylistId], bpm: 0
   };
-  State.songs.unshift(local); saveSongsLocal(); renderLibrary();
+  State.songs.unshift(local); saveSongsLocal();
+  autoClassify(local).then(() => renderLibrary()).catch(()=>{});
+  renderLibrary();
   toast('已加入歌單');
   if (State.settings.gasUrl) {
     try {
@@ -2757,7 +2909,9 @@ function bind() {
 //============== Init ==============
 async function init() {
   loadSettings(); loadSongsLocal(); loadPlaylistsLocal();
-  bind(); initVoice(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
+  State.langFilter = localStorage.getItem(LS.langF) || 'all';
+  State.genderFilter = localStorage.getItem(LS.genderF) || 'all';
+  bind(); initVoice(); renderClassifyTabs(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
   switchMode(localStorage.getItem(LS.viewMode) || 'lyrics');
   State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
   State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
@@ -2773,6 +2927,9 @@ async function init() {
     // 限速 push,避免一次打爆雲端
     newlyTagged.forEach((s, i) => setTimeout(() => pushSongToCloud(s), i * 250));
   }
+  // 補分類:沒 lang/gender 的限速跑(每 1.2s 一首,避免 Gemini quota)
+  const needClassify = State.songs.filter(s => !s.lang || !s.gender);
+  needClassify.forEach((s, i) => setTimeout(() => autoClassify(s).then(() => { if (i === needClassify.length - 1) { renderClassifyTabs(); renderLibrary(); } }), i * 1200));
   const lastId = localStorage.getItem(LS.current);
   if (lastId && State.songs.some(s => s.id === lastId)) {
     const s = State.songs.find(x => x.id === lastId);
