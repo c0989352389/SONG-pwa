@@ -272,8 +272,11 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .result-main .preview-btn,.result-main button[data-vid]{flex-shrink:0}
 @keyframes song-marquee{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
 .preview-btn.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
-.preview-frame{margin-top:8px;border-radius:10px;overflow:hidden;background:#000}
-.preview-tip{font-size:11px;color:var(--text3);padding:6px 8px;text-align:center}
+.preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px}
+.preview-frame{width:min(560px,92vw);background:#000;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.12)}
+.preview-frame iframe{display:block;width:100%;aspect-ratio:16/9;border:0}
+.preview-tip{font-size:12px;color:var(--text2);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(20,20,28,.8)}
+.preview-tip .btn{padding:6px 12px;font-size:12px}
 .lyr-box.tap-sync .lyr-line{cursor:pointer;border-left:3px solid transparent;padding-left:8px;transition:all .12s}
 .lyr-box.tap-sync .lyr-line:hover{background:rgba(255,255,255,.08);border-left-color:var(--accent)}
 .tap-tag{margin-left:8px;font-size:11px;color:var(--accent2);background:rgba(0,0,0,.25);padding:1px 6px;border-radius:8px;font-family:ui-monospace,monospace}
@@ -2467,23 +2470,26 @@ function _bindYTRowButtons(list) {
   });
 }
 let _previewVid = null;
+function closePreview() {
+  document.querySelectorAll('.preview-overlay').forEach(el => el.remove());
+  document.querySelectorAll('.preview-btn.on').forEach(b => b.classList.remove('on'));
+  _previewVid = null;
+}
 function togglePreview(list, vid) {
-  // 先關掉其他列的預覽
-  list.querySelectorAll('.preview-slot').forEach(s => { if (s.dataset.vid !== vid) s.innerHTML = ''; });
-  list.querySelectorAll('.preview-btn').forEach(b => { if (b.dataset.prev !== vid) b.classList.remove('on'); });
-  const row = list.querySelector(`.result-row[data-row-vid="${vid}"]`);
-  if (!row) return;
-  const slot = row.querySelector('.preview-slot');
-  const btn = row.querySelector('.preview-btn');
-  if (slot.dataset.vid === vid) {
-    slot.innerHTML = ''; slot.dataset.vid = ''; btn.classList.remove('on'); _previewVid = null;
-    return;
-  }
-  // 取得長度估算副歌位置:沒辦法快速拿到長度,先用固定 60 秒(多數歌曲在 1:00-1:30 進副歌)
+  if (_previewVid === vid) { closePreview(); return; }
+  closePreview();
   const start = 60, end = 95;
-  slot.dataset.vid = vid;
-  slot.innerHTML = `<div class="preview-frame"><iframe width="100%" height="200" src="https://www.youtube.com/embed/${vid}?autoplay=1&start=${start}&end=${end}&rel=0&modestbranding=1" allow="autoplay; encrypted-media" allowfullscreen frameborder="0"></iframe><div class="preview-tip">▶ 試聽 ${start}s - ${end}s(假設副歌位置),再點 🔊 關閉</div></div>`;
-  btn.classList.add('on');
+  const overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+  overlay.innerHTML = `<div class="preview-frame">
+    <iframe src="https://www.youtube.com/embed/${vid}?autoplay=1&start=${start}&end=${end}&rel=0&modestbranding=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen frameborder="0"></iframe>
+    <div class="preview-tip"><span>▶ 試聽 ${start}s - ${end}s(約副歌)</span><button class="btn pri" id="prev-close">✕ 關閉</button></div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closePreview(); });
+  overlay.querySelector('#prev-close').addEventListener('click', closePreview);
+  const btn = list.querySelector(`.preview-btn[data-prev="${vid}"]`);
+  if (btn) btn.classList.add('on');
   _previewVid = vid;
 }
 function _renderYTPage() {
