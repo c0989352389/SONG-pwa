@@ -2935,8 +2935,8 @@ function bind() {
   $('#btn-ab-loop').addEventListener('click', toggleAbLoop);
   $('#btn-ab-clear').addEventListener('click', clearAb);
 
-  $('#btn-refetch-lrc').addEventListener('click', refetchLyrics);
-  $('#btn-translate-all').addEventListener('click', translateAll);
+  $('#btn-refetch-lrc')?.addEventListener('click', refetchLyrics);
+  $('#btn-translate-all')?.addEventListener('click', translateAll);
   $('#btn-lrc-back').addEventListener('click', () => shiftLrc(-0.5));
   $('#btn-lrc-fwd').addEventListener('click', () => shiftLrc(0.5));
   $('#btn-lrc-reset').addEventListener('click', resetLrcOffset);
