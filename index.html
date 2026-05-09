@@ -678,16 +678,15 @@ body.mode-lyrics #np-art{display:none}
   <div class="modal" id="modal-pl">
     <div class="modal-card">
       <div class="modal-h"><h3>📁 我的歌單分類</h3><button class="gb" data-close>✕</button></div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">
-        把歌曲分門別類管理，例如：<br>
-        「日語抒情」「開車聽」「跑步歌單」「練英文」<br>
-        每首歌可同時放進多個分類。
-      </div>
-      <div id="pl-mgr"></div>
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <input type="text" id="pl-new-name" placeholder="新分類名稱" style="flex:1">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="pl-new-name" placeholder="✚ 新分類名稱" style="flex:1">
         <button class="btn pri" id="btn-pl-create">建立</button>
       </div>
+      <div style="margin-bottom:10px">
+        <input type="text" id="pl-search" placeholder="🔍 搜尋分類" style="width:100%">
+      </div>
+      <div id="pl-mgr"></div>
+      <div id="pl-pager" style="display:flex;gap:8px;margin-top:10px;align-items:center;justify-content:center"></div>
     </div>
   </div>
 
@@ -1299,7 +1298,17 @@ function onYouTubeIframeAPIReady() {
     height:'100%', width:'100%',
     playerVars: { playsinline:1, controls:0, rel:0, modestbranding:1, iv_load_policy:3 },
     events: {
-      onReady: () => { State.ready = true; State.player.setPlaybackRate(State.speed); },
+      onReady: () => {
+        State.ready = true; State.player.setPlaybackRate(State.speed);
+        // 還原上一首歌(cue 不自動播,等使用者按 ▶,規避瀏覽器自動播放限制)
+        const lastId = localStorage.getItem(LS.current);
+        const lastSeek = +localStorage.getItem('song.lastSeek') || 0;
+        const s = lastId && State.songs.find(x => x.id === lastId);
+        if (s) {
+          try { State.player.cueVideoById({ videoId: s.videoId, startSeconds: lastSeek }); } catch(_){}
+          applySongVolume(s);
+        }
+      },
       onStateChange: onPlayerState,
       onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
       onError: e => handleYtError(e.data)
@@ -1350,6 +1359,8 @@ function startProgress() {
     $('#np-fill').style.width = pct + '%';
     $('#np-knob').style.left = pct + '%';
     syncLyric(t);
+    // 每 2 秒記住目前秒數,下次開啟可從這裡繼續
+    if (Math.floor(t) % 2 === 0) localStorage.setItem('song.lastSeek', String(Math.floor(t)));
     if (State.ab.on && State.ab.b !== null && t >= State.ab.b) {
       State.player.seekTo(State.ab.a || 0, true);
     }
@@ -2275,10 +2286,25 @@ async function saveEditSong() {
   _editCtx = null;
 }
 
+const PL_PAGE_SIZE = 20;
+let _plMgrPage = 0;
 function openPlMgr() {
   const m = $('#modal-pl');
-  const pls = [...State.playlists].sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-  $('#pl-mgr').innerHTML = pls.length ? pls.map(p => {
+  _plMgrPage = 0;
+  renderPlMgr();
+  m.classList.add('show');
+  return; // skip 舊流程
+}
+function renderPlMgr() {
+  const q = ($('#pl-search')?.value || '').trim().toLowerCase();
+  const all = [...State.playlists].sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0))
+    .filter(p => !q || String(p.name||'').toLowerCase().includes(q));
+  const totalPages = Math.max(1, Math.ceil(all.length / PL_PAGE_SIZE));
+  if (_plMgrPage >= totalPages) _plMgrPage = totalPages - 1;
+  if (_plMgrPage < 0) _plMgrPage = 0;
+  const start = _plMgrPage * PL_PAGE_SIZE;
+  const pls = all.slice(start, start + PL_PAGE_SIZE);
+  $('#pl-mgr').innerHTML = all.length ? pls.map(p => {
     const count = State.songs.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(p.id)).length;
     return `<div class="sec-row" data-pid="${p.id}" style="margin-bottom:6px">
       <span class="drag-h" style="cursor:grab;color:var(--text3);padding:8px;font-size:18px;letter-spacing:-3px;user-select:none;touch-action:none">⋮⋮</span>
@@ -2286,7 +2312,17 @@ function openPlMgr() {
       <span style="font-size:12px;color:var(--text3);min-width:50px;text-align:right">${count} 首</span>
       <button class="x" data-del-pl="${p.id}" title="刪除">✕</button>
     </div>`;
-  }).join('') : '<div class="lyr-empty" style="padding:14px 0">尚無分類,在下方建立第一個</div>';
+  }).join('') : '<div class="lyr-empty" style="padding:14px 0">' + (q ? '沒有符合的分類' : '尚無分類,在最上方建立第一個') + '</div>';
+  const pager = $('#pl-pager');
+  if (pager) {
+    if (totalPages > 1) {
+      pager.innerHTML = `<button class="btn dim sm" id="plm-prev" ${_plMgrPage===0?'disabled':''}>← 上一頁</button>
+        <span style="font-size:12px;color:var(--text3)">${_plMgrPage+1} / ${totalPages} 頁(共 ${all.length})</span>
+        <button class="btn dim sm" id="plm-next" ${_plMgrPage>=totalPages-1?'disabled':''}>下一頁 →</button>`;
+      pager.querySelector('#plm-prev').onclick = () => { _plMgrPage--; renderPlMgr(); };
+      pager.querySelector('#plm-next').onclick = () => { _plMgrPage++; renderPlMgr(); };
+    } else { pager.innerHTML = ''; }
+  }
   // 啟用上下拖曳排序
   if (window.Sortable && pls.length) {
     const mgr = $('#pl-mgr');
@@ -2321,10 +2357,9 @@ function openPlMgr() {
       savePlaylistsLocal(); saveSongsLocal();
       if (State.settings.gasUrl) try { await gas('deletePlaylist', { ID: pid }); } catch(_){}
       if (State.currentPlaylistId === pid) State.currentPlaylistId = 'all';
-      renderPlaylistTabs(); renderLibrary(); openPlMgr();
+      renderPlaylistTabs(); renderLibrary(); renderPlMgr();
     });
   });
-  m.classList.add('show');
 }
 async function createPlaylist() {
   const name = $('#pl-new-name').value.trim(); if (!name) return;
@@ -2334,7 +2369,7 @@ async function createPlaylist() {
   State.playlists.push(p); savePlaylistsLocal();
   $('#pl-new-name').value = '';
   if (State.settings.gasUrl) { try { await gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': '' }); } catch(_){} }
-  renderPlaylistTabs(); openPlMgr();
+  renderPlaylistTabs(); renderPlMgr();
 }
 
 //============== Add song ==============
@@ -3045,6 +3080,7 @@ function bind() {
 
   $('#btn-pl-create').addEventListener('click', createPlaylist);
   $('#pl-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createPlaylist(); });
+  $('#pl-search').addEventListener('input', () => { _plMgrPage = 0; renderPlMgr(); });
 
   $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('show')));
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
