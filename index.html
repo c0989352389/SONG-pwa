@@ -503,8 +503,6 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           </button>
         </div>
-        <div class="pl-tabs" id="lang-tabs"></div>
-        <div class="pl-tabs" id="gender-tabs"></div>
         <div class="pl-tabs" id="pl-tabs"></div>
       </div>
       <div id="lib-list"></div>
@@ -676,17 +674,8 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
   <div class="modal" id="modal-pl">
     <div class="modal-card">
       <div class="modal-h"><h3>📁 我的歌單分類</h3><button class="gb" data-close>✕</button></div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">⚡ 快速建立</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="pl-quick">
-        <span class="chip" data-pl-quick="國語">國語</span>
-        <span class="chip" data-pl-quick="台語">台語</span>
-        <span class="chip" data-pl-quick="其他語言">其他語言</span>
-        <span class="chip" data-pl-quick="男歌星">♂ 男歌星</span>
-        <span class="chip" data-pl-quick="女歌星">♀ 女歌星</span>
-        <span class="chip" data-pl-quick="團體">團體</span>
-      </div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input type="text" id="pl-new-name" placeholder="✚ 自訂分類名稱" style="flex:1">
+        <input type="text" id="pl-new-name" placeholder="✚ 新分類名稱(例:周杰倫)" style="flex:1">
         <button class="btn pri" id="btn-pl-create">建立</button>
       </div>
       <div style="margin-bottom:10px">
@@ -1972,10 +1961,8 @@ function _orderKey(s, plId) {
   return (typeof v === 'number') ? v : 999999;
 }
 function visibleSongs() {
-  const lf = State.langFilter, gf = State.genderFilter, pid = State.currentPlaylistId;
+  const pid = State.currentPlaylistId;
   let arr = State.songs;
-  if (lf !== 'all') arr = arr.filter(s => (s.lang || '其他') === lf);
-  if (gf !== 'all') arr = arr.filter(s => (s.gender || '其他') === gf);
   if (pid !== 'all') {
     arr = arr.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(pid));
     arr = arr.slice().sort((a,b) => _orderKey(a, pid) - _orderKey(b, pid));
@@ -2595,7 +2582,7 @@ async function autoClassify(s, force) {
 
 async function addSong(s) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
-  // 只有「同歌手 + 同歌名」才算真正衝突,跳 prompt 讓使用者區分;不同歌手直接加入
+  // 同歌手+同歌名才提示
   const sims = _findSimilar(s.title, s.artist, null).filter(x => x.sameArtist);
   if (sims.length) {
     const lines = sims.slice(0, 3).map(x => `• ${x.s.title}${x.s.artist ? ' / ' + x.s.artist : ''}`).join('\n');
@@ -2603,27 +2590,73 @@ async function addSong(s) {
     if (newName === null) { toast('已取消'); return null; }
     if (newName.trim()) s = { ...s, title: newName.trim() };
   }
+  // 強制選擇歌單(可選現有或新建)
+  const targetPlId = await pickPlaylistForNewSong(s);
+  if (!targetPlId) { toast('已取消'); return null; }
   const local = {
     id: uid(), title: s.title, artist: s.artist || '', videoId: s.videoId,
     thumb: s.thumb || `https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg`,
     dur:'', addedAt: new Date().toISOString(), tag: (s.artist || '').trim(), playCount:0, lastPlay:'',
     lrc:'', note:'', translations:{}, explanations:{}, sections:[],
-    playlistIds: State.currentPlaylistId === 'all' ? [] : [State.currentPlaylistId], bpm: 0
+    playlistIds: [targetPlId], bpm: 0
   };
-  State.songs.unshift(local); saveSongsLocal();
-  autoClassify(local).then(() => renderLibrary()).catch(()=>{});
-  renderLibrary();
-  toast('已加入歌單');
+  State.songs.unshift(local); saveSongsLocal(); renderLibrary();
+  toast('已加入「' + (State.playlists.find(p=>p.id===targetPlId)?.name || '') + '」');
   if (State.settings.gasUrl) {
     try {
-      const r = await gas('upsertSong', {
+      await gas('upsertSong', {
         'ID': local.id, '歌名': local.title, '歌手': local.artist, 'YouTubeID': local.videoId,
         '縮圖': local.thumb, '時長': local.dur, '歌單IDs': JSON.stringify(local.playlistIds)
       });
-      if (r && r.ok) {/* keep client id */}
     } catch(e){ console.warn('cloud add', e); }
   }
   return local;
+}
+// 加歌時跳出選歌單對話框,使用者可選現有或新建
+function pickPlaylistForNewSong(s) {
+  return new Promise(resolve => {
+    const m = document.createElement('div');
+    m.className = 'modal show';
+    m.style.zIndex = '9500';
+    const pls = [...State.playlists].sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+    m.innerHTML = `<div class="modal-card">
+      <div class="modal-h"><h3>📁 選擇歌單分類</h3></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">
+        要把「${escapeHtml(s.title || '')}」加到哪個歌單分類?
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;max-height:240px;overflow-y:auto" id="pick-list">
+        ${pls.length ? pls.map(p => `<span class="chip" data-pid="${p.id}">${escapeHtml(p.name)}</span>`).join('') : '<div style="color:var(--text3);font-size:12px">尚無分類,請新建</div>'}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">或新建分類</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="pick-new" placeholder="輸入新分類名稱(例:周杰倫)" style="flex:1">
+        <button class="btn pri" id="pick-new-btn">建立並加入</button>
+      </div>
+      <div class="modal-foot">
+        <button class="btn dim" id="pick-cancel">取消</button>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+    const close = (val) => { m.remove(); resolve(val); };
+    m.querySelectorAll('[data-pid]').forEach(c => c.addEventListener('click', () => close(c.dataset.pid)));
+    m.querySelector('#pick-cancel').addEventListener('click', () => close(null));
+    m.addEventListener('click', e => { if (e.target === m) close(null); });
+    const newBtn = m.querySelector('#pick-new-btn');
+    const newInp = m.querySelector('#pick-new');
+    const doNew = async () => {
+      const name = newInp.value.trim(); if (!name) { newInp.focus(); return; }
+      const exist = State.playlists.find(p => String(p.name||'').toLowerCase() === name.toLowerCase());
+      if (exist) { close(exist.id); return; }
+      const p = { id: uid('pl'), name, sortOrder: State.playlists.length, color: '' };
+      State.playlists.push(p); savePlaylistsLocal(); renderPlaylistTabs();
+      if (State.settings.gasUrl) gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': '' }).catch(()=>{});
+      close(p.id);
+    };
+    newBtn.addEventListener('click', doNew);
+    newInp.addEventListener('keydown', e => { if (e.key === 'Enter') doNew(); });
+    // 預設聚焦至新建欄(若無分類)
+    setTimeout(() => { if (!pls.length) newInp.focus(); }, 50);
+  });
 }
 async function aiRecommend(seed, count=12) {
   if (!State.settings.geminiKey) throw new Error('需要 Gemini API Key');
@@ -3173,16 +3206,6 @@ function bind() {
   $('#btn-pl-create').addEventListener('click', createPlaylist);
   $('#pl-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createPlaylist(); });
   $('#pl-search').addEventListener('input', () => { _plMgrPage = 0; renderPlMgr(); });
-  document.querySelectorAll('[data-pl-quick]').forEach(c => c.addEventListener('click', async () => {
-    const name = c.dataset.plQuick;
-    const exist = State.playlists.find(p => String(p.name||'').trim().toLowerCase() === name.toLowerCase());
-    if (exist) { toast('已有「' + name + '」'); return; }
-    const p = { id: uid('pl'), name, sortOrder: State.playlists.length, color: '' };
-    State.playlists.push(p); savePlaylistsLocal();
-    if (State.settings.gasUrl) gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': '' }).catch(()=>{});
-    renderPlaylistTabs(); renderPlMgr();
-    toast('已建立「' + name + '」');
-  }));
 
   $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('show')));
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
@@ -3194,7 +3217,7 @@ async function init() {
   loadSettings(); loadSongsLocal(); loadPlaylistsLocal();
   State.langFilter = localStorage.getItem(LS.langF) || 'all';
   State.genderFilter = localStorage.getItem(LS.genderF) || 'all';
-  bind(); initVoice(); renderClassifyTabs(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
+  bind(); initVoice(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
   switchMode(localStorage.getItem(LS.viewMode) || 'vinyl');
   State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
   State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
@@ -3211,9 +3234,6 @@ async function init() {
     // 限速 push,避免一次打爆雲端
     newlyTagged.forEach((s, i) => setTimeout(() => pushSongToCloud(s), i * 250));
   }
-  // 補分類:沒 lang/gender 的限速跑(每 1.2s 一首,避免 Gemini quota)
-  const needClassify = State.songs.filter(s => !s.lang || !s.gender);
-  needClassify.forEach((s, i) => setTimeout(() => autoClassify(s).then(() => { if (i === needClassify.length - 1) { renderClassifyTabs(); renderLibrary(); } }), i * 1200));
   restoreLastSong();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
