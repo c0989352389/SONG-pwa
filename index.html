@@ -2139,11 +2139,11 @@ async function ytSearchNext() {
 }
 async function addSong(s) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
-  // 標題相似檢查:有相似(尤其同歌手)時,讓使用者編輯名稱以區分
-  const sims = _findSimilar(s.title, s.artist, null);
+  // 只有「同歌手 + 同歌名」才算真正衝突,跳 prompt 讓使用者區分;不同歌手直接加入
+  const sims = _findSimilar(s.title, s.artist, null).filter(x => x.sameArtist);
   if (sims.length) {
-    const lines = sims.slice(0, 3).map(x => `• ${x.s.title}${x.s.artist ? ' / ' + x.s.artist : ''}${x.sameArtist ? ' (歌手相同)' : ''}`).join('\n');
-    const newName = prompt(`已有相似歌曲:\n${lines}\n\n建議改名以區分(例如加版本/年份)。\n直接按確定 = 用原名加入`, s.title || '');
+    const lines = sims.slice(0, 3).map(x => `• ${x.s.title}${x.s.artist ? ' / ' + x.s.artist : ''}`).join('\n');
+    const newName = prompt(`已有同歌手的相似歌曲:\n${lines}\n\n建議加版本/年份等以區分。\n直接按確定 = 用原名加入`, s.title || '');
     if (newName === null) { toast('已取消'); return null; }
     if (newName.trim()) s = { ...s, title: newName.trim() };
   }
@@ -2637,14 +2637,15 @@ async function init() {
   State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
   updatePlayModeUI();
   if (State.settings.gasUrl) await syncFromGAS();
-  // 自動補上歌手標籤(現有歌曲沒設過 tag 的)
-  let tagged = 0;
+  // 自動補上歌手標籤(只處理沒 tag 但有 artist 的)
+  const newlyTagged = [];
   State.songs.forEach(s => {
-    if (!s.tag && s.artist && s.artist.trim()) { s.tag = s.artist.trim(); tagged++; }
+    if (!s.tag && s.artist && s.artist.trim()) { s.tag = s.artist.trim(); newlyTagged.push(s); }
   });
-  if (tagged) {
+  if (newlyTagged.length) {
     saveSongsLocal();
-    State.songs.forEach(s => { if (s.tag === s.artist) pushSongToCloud(s); });
+    // 限速 push,避免一次打爆雲端
+    newlyTagged.forEach((s, i) => setTimeout(() => pushSongToCloud(s), i * 250));
   }
   const lastId = localStorage.getItem(LS.current);
   if (lastId && State.songs.some(s => s.id === lastId)) {
