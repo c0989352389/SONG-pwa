@@ -380,8 +380,10 @@ body.mode-lyrics #np-vis{display:none}
         </div>
         <div class="np-title" id="np-title">尚未選曲</div>
         <div class="np-artist" id="np-artist">點下方收藏選一首，或到「加歌」搜尋</div>
-        <div style="text-align:center;margin-bottom:14px">
+        <div style="text-align:center;margin-bottom:14px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
           <button class="btn sm" id="btn-current-pl" style="border-radius:18px">＋ 加入歌單分組</button>
+          <button class="btn sm dim" id="btn-edit-song" style="border-radius:18px">✏ 編輯名稱</button>
+          <button class="btn sm danger" id="btn-del-song" style="border-radius:18px">🗑 刪除</button>
         </div>
 
         <div class="np-prog">
@@ -583,6 +585,26 @@ body.mode-lyrics #np-vis{display:none}
       <div class="modal-foot">
         <button class="btn dim" data-close>取消</button>
         <button class="btn pri" id="btn-wrong-submit">重新搜尋</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit song name -->
+  <div class="modal" id="modal-edit">
+    <div class="modal-card">
+      <div class="modal-h"><h3 id="edit-h">✏ 編輯歌曲名稱</h3><button class="gb" data-close>✕</button></div>
+      <div id="edit-warn" style="font-size:12px;color:#ffb86b;margin-bottom:12px;line-height:1.6;display:none"></div>
+      <div class="modal-row">
+        <label>歌名</label>
+        <input type="text" id="edit-title">
+      </div>
+      <div class="modal-row">
+        <label>歌手</label>
+        <input type="text" id="edit-artist">
+      </div>
+      <div class="modal-foot">
+        <button class="btn dim" data-close>取消</button>
+        <button class="btn pri" id="btn-edit-save">儲存</button>
       </div>
     </div>
   </div>
@@ -1788,6 +1810,7 @@ function openSongSheet(id) {
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn pri" data-sheet-act="play">▶ 播放</button>
+      <button class="btn" data-sheet-act="edit">✏ 編輯名稱</button>
       <button class="btn" data-sheet-act="addtag">標籤</button>
       <button class="btn danger" data-sheet-act="del">刪除</button>
     </div>`;
@@ -1821,6 +1844,7 @@ function openSongSheet(id) {
   $('#sheet-body').querySelector('[data-sheet-act="play"]').addEventListener('click', () => {
     closeSheet(); playSong(s.id); switchPage('player');
   });
+  $('#sheet-body').querySelector('[data-sheet-act="edit"]').addEventListener('click', () => { closeSheet(); openEditSong(s.id); });
   $('#sheet-body').querySelector('[data-sheet-act="addtag"]').addEventListener('click', async () => {
     const t = prompt('標籤(空白以逗號分隔):', s.tag || '');
     if (t === null) return;
@@ -1832,11 +1856,93 @@ function openSongSheet(id) {
 function closeSheet(){ $('#sheet-song').classList.remove('show'); }
 
 async function deleteSong(id) {
-  if (!confirm('確定刪除這首歌嗎？')) return;
+  if (!confirm('確定刪除這首歌嗎?')) return;
+  const wasCur = State.currentId === id;
   State.songs = State.songs.filter(s => s.id !== id);
   saveSongsLocal();
   if (State.settings.gasUrl) { try { await gas('deleteSong', { ID: id }); } catch(_){} }
-  renderLibrary(); toast('已刪除');
+  renderLibrary();
+  if (wasCur) {
+    State.currentId = null;
+    try { State.player && State.player.stopVideo && State.player.stopVideo(); } catch(_){}
+    $('#np-title').textContent = '尚未選曲';
+    $('#np-artist').textContent = '點下方收藏選一首,或到「加歌」搜尋';
+  }
+  toast('已刪除');
+}
+
+// 標題正規化(去品質標記/標點/空白/小寫)用於相似比對
+function _normTitle(t) {
+  if (!t) return '';
+  let s = String(t).toLowerCase();
+  s = s.replace(/[\(（\[【「『《][^)\）\]】」』》]*[\)）\]】」』》]/g, ' ');
+  s = s.replace(/(高音質|高解析|高清|無損|hd|4k|hq|official|mv|m\/v|music\s*video|lyrics?|歌詞|完整版|live|audio|cover|remix|karaoke|官方|純享版)/gi, ' ');
+  s = s.replace(/[\s\-_·•~!@#$%^&*+=,./?<>|"';:、,。！？]/g, '');
+  return s;
+}
+function _findSimilar(title, artist, excludeId) {
+  const nt = _normTitle(title); if (!nt || nt.length < 2) return [];
+  const na = _normTitle(artist);
+  return State.songs.filter(s => {
+    if (s.id === excludeId) return false;
+    const st = _normTitle(s.title);
+    if (!st) return false;
+    // 完全相同 normalized → 強相似
+    if (st === nt) return true;
+    // 一方包含另一方且長度差不大 → 相似
+    if ((st.includes(nt) || nt.includes(st)) && Math.abs(st.length - nt.length) <= 4) return true;
+    return false;
+  }).map(s => ({
+    s,
+    sameArtist: na && _normTitle(s.artist) === na
+  }));
+}
+
+let _editCtx = null; // { id, onDone? }
+function openEditSong(id) {
+  const s = State.songs.find(x => x.id === id); if (!s) return;
+  _editCtx = { id };
+  $('#edit-h').textContent = '✏ 編輯歌曲名稱';
+  $('#edit-title').value = s.title || '';
+  $('#edit-artist').value = s.artist || '';
+  $('#edit-warn').style.display = 'none';
+  _refreshEditWarn();
+  $('#modal-edit').classList.add('show');
+  setTimeout(() => $('#edit-title').focus(), 50);
+}
+function _refreshEditWarn() {
+  const t = $('#edit-title').value.trim();
+  const a = $('#edit-artist').value.trim();
+  const sims = _findSimilar(t, a, _editCtx ? _editCtx.id : null);
+  const w = $('#edit-warn');
+  if (sims.length) {
+    const lines = sims.slice(0, 3).map(x => `• ${escapeHtml(x.s.title || '')}${x.s.artist ? ' / ' + escapeHtml(x.s.artist) : ''}${x.sameArtist ? ' <span style="color:#ff8a8a">(歌手也相同)</span>' : ''}`).join('<br>');
+    w.innerHTML = '⚠ 已有相似歌曲,建議改名以區分:<br>' + lines;
+    w.style.display = 'block';
+  } else {
+    w.style.display = 'none';
+  }
+}
+async function saveEditSong() {
+  if (!_editCtx) return;
+  const s = State.songs.find(x => x.id === _editCtx.id); if (!s) return;
+  const newTitle = $('#edit-title').value.trim();
+  const newArtist = $('#edit-artist').value.trim();
+  if (!newTitle) { toast('歌名不能空白'); return; }
+  s.title = newTitle;
+  s.artist = newArtist;
+  // 改名後清空舊歌詞搜尋覆寫(讓下次自動重抓)
+  delete s.searchTitle; delete s.searchArtist;
+  saveSongsLocal();
+  pushSongToCloud(s);
+  if (State.currentId === s.id) {
+    $('#np-title').textContent = s.title || '(未命名)';
+    $('#np-artist').textContent = s.artist || '';
+  }
+  renderLibrary();
+  $('#modal-edit').classList.remove('show');
+  toast('已儲存');
+  _editCtx = null;
 }
 
 function openPlMgr() {
@@ -1978,6 +2084,14 @@ async function ytSearchNext() {
 }
 async function addSong(s) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
+  // 標題相似檢查:有相似(尤其同歌手)時,讓使用者編輯名稱以區分
+  const sims = _findSimilar(s.title, s.artist, null);
+  if (sims.length) {
+    const lines = sims.slice(0, 3).map(x => `• ${x.s.title}${x.s.artist ? ' / ' + x.s.artist : ''}${x.sameArtist ? ' (歌手相同)' : ''}`).join('\n');
+    const newName = prompt(`已有相似歌曲:\n${lines}\n\n建議改名以區分(例如加版本/年份)。\n直接按確定 = 用原名加入`, s.title || '');
+    if (newName === null) { toast('已取消'); return null; }
+    if (newName.trim()) s = { ...s, title: newName.trim() };
+  }
   const local = {
     id: uid(), title: s.title, artist: s.artist || '', videoId: s.videoId,
     thumb: s.thumb || `https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg`,
@@ -2315,6 +2429,17 @@ function bind() {
     if (!State.currentId) { toast('先選一首歌'); return; }
     openSongSheet(State.currentId);
   });
+  $('#btn-edit-song').addEventListener('click', () => {
+    if (!State.currentId) { toast('先選一首歌'); return; }
+    openEditSong(State.currentId);
+  });
+  $('#btn-del-song').addEventListener('click', () => {
+    if (!State.currentId) { toast('先選一首歌'); return; }
+    deleteSong(State.currentId);
+  });
+  $('#btn-edit-save').addEventListener('click', saveEditSong);
+  $('#edit-title').addEventListener('input', _refreshEditWarn);
+  $('#edit-artist').addEventListener('input', _refreshEditWarn);
 
   const bar = $('#np-bar');
   function barPct(clientX) {
