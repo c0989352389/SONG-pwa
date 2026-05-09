@@ -1903,8 +1903,8 @@ function renderClassifyTabs() {
 function renderPlaylistTabs() {
   const tabs = $('#pl-tabs');
   const pls = [{ id:'all', name:'全部' }, ...State.playlists.sort((a,b)=>a.sortOrder-b.sortOrder)];
-  tabs.innerHTML = pls.map(p => `<button class="pl-tab ${p.id===State.currentPlaylistId?'active':''}" data-id="${p.id}">${escapeHtml(p.name)}</button>`).join('') +
-    `<button class="pl-tab add" id="btn-pl-mgr">＋ 管理</button>`;
+  tabs.innerHTML = `<button class="pl-tab add" id="btn-pl-mgr">＋ 管理</button>` +
+    pls.map(p => `<button class="pl-tab ${p.id===State.currentPlaylistId?'active':''}" data-id="${p.id}">${escapeHtml(p.name)}</button>`).join('');
   tabs.querySelectorAll('[data-id]').forEach(b => {
     b.addEventListener('click', () => {
       State.currentPlaylistId = b.dataset.id;
