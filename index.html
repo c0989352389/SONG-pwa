@@ -195,9 +195,9 @@ body.fake-fs::after{content:'✕ 結束';position:fixed;top:env(safe-area-inset-
 @keyframes np-marquee{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
 .np-artist{font-size:13px;color:var(--text2);text-align:center;margin-bottom:18px}
 .np-prog{padding:0 6px;margin-bottom:14px}
-.np-bar{height:8px;background:rgba(255,255,255,.1);border-radius:4px;position:relative;cursor:pointer;touch-action:none;padding:8px 0;margin:-8px 0;overflow:visible}
-.np-bar::before{content:'';position:absolute;left:0;right:0;top:8px;height:8px;background:rgba(255,255,255,.1);border-radius:4px;pointer-events:none}
-.np-fill-wrap{position:absolute;left:0;right:0;top:8px;height:8px;border-radius:4px;overflow:hidden;pointer-events:none}
+.np-bar{height:28px;background:transparent;position:relative;cursor:pointer;touch-action:none;display:flex;align-items:center;user-select:none;-webkit-user-select:none}
+.np-bar::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:8px;background:rgba(255,255,255,.12);border-radius:4px;pointer-events:none}
+.np-fill-wrap{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:8px;border-radius:4px;overflow:hidden;pointer-events:none}
 .np-knob{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--accent);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4);transition:width .1s,height .1s}
 .np-bar.dragging .np-knob{width:24px;height:24px}
 .np-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;width:0%;transition:width .25s linear}
@@ -2990,33 +2990,58 @@ function bind() {
     if (!State.player || !State.duration) return;
     State.player.seekTo(State.duration * pct, true);
   }
-  bar.addEventListener('pointerdown', e => {
-    // 嘗試即時取 duration(可能還在 CUED/PAUSED 狀態,但 YT API 已能回 duration)
+  function ensureDuration() {
     if (!State.duration && State.player && State.player.getDuration) {
       State.duration = State.player.getDuration() || 0;
       if (State.duration) $('#np-dur').textContent = fmt(State.duration);
     }
-    if (!State.duration) { toast('歌曲尚未載入完成'); return; }
-    e.preventDefault();
+    return State.duration > 0;
+  }
+  function startDrag(clientX) {
+    if (!ensureDuration()) { toast('歌曲尚未載入完成'); return; }
     State.dragging = true;
     bar.classList.add('dragging');
-    try { bar.setPointerCapture(e.pointerId); } catch(_){}
-    previewSeek(barPct(e.clientX));
-  });
-  bar.addEventListener('pointermove', e => {
+    previewSeek(barPct(clientX));
+  }
+  function moveDrag(clientX) {
     if (!State.dragging) return;
-    previewSeek(barPct(e.clientX));
-  });
-  function endDrag(e) {
+    previewSeek(barPct(clientX));
+  }
+  function endDrag(clientX) {
     if (!State.dragging) return;
-    const pct = barPct(e.clientX);
+    const pct = barPct(clientX);
     State.dragging = false;
     bar.classList.remove('dragging');
-    try { bar.releasePointerCapture(e.pointerId); } catch(_){}
     commitSeek(pct);
   }
-  bar.addEventListener('pointerup', endDrag);
-  bar.addEventListener('pointercancel', endDrag);
+  // Pointer Events(桌機+多數手機)
+  bar.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { bar.setPointerCapture(e.pointerId); } catch(_){}
+    startDrag(e.clientX);
+  });
+  bar.addEventListener('pointermove', e => moveDrag(e.clientX));
+  bar.addEventListener('pointerup', e => { try { bar.releasePointerCapture(e.pointerId); } catch(_){} endDrag(e.clientX); });
+  bar.addEventListener('pointercancel', e => endDrag(e.clientX));
+  // Touch fallback(iOS Safari 某些情況 pointer event 不可靠)
+  bar.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    startDrag(e.touches[0].clientX);
+  }, { passive:false });
+  bar.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    moveDrag(e.touches[0].clientX);
+  }, { passive:false });
+  bar.addEventListener('touchend', e => {
+    const t = e.changedTouches && e.changedTouches[0];
+    endDrag(t ? t.clientX : 0);
+  });
+  bar.addEventListener('touchcancel', e => {
+    const t = e.changedTouches && e.changedTouches[0];
+    endDrag(t ? t.clientX : 0);
+  });
 
   $('#lib-q').addEventListener('input', e => renderLibrary(e.target.value));
 
