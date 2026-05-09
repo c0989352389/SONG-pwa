@@ -1304,14 +1304,7 @@ function onYouTubeIframeAPIReady() {
     events: {
       onReady: () => {
         State.ready = true; State.player.setPlaybackRate(State.speed);
-        // 還原上一首歌(cue 不自動播,等使用者按 ▶,規避瀏覽器自動播放限制)
-        const lastId = localStorage.getItem(LS.current);
-        const lastSeek = +localStorage.getItem('song.lastSeek') || 0;
-        const s = lastId && State.songs.find(x => x.id === lastId);
-        if (s) {
-          try { State.player.cueVideoById({ videoId: s.videoId, startSeconds: lastSeek }); } catch(_){}
-          applySongVolume(s);
-        }
+        restoreLastSong();
       },
       onStateChange: onPlayerState,
       onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
@@ -1378,6 +1371,27 @@ function startProgress() {
 function stopProgress() { if (State.progressTimer) { clearInterval(State.progressTimer); State.progressTimer = null; } }
 
 function getCur() { return State.songs.find(s => s.id === State.currentId); }
+let _restored = false;
+function restoreLastSong() {
+  if (_restored) return;
+  if (!State.songs || !State.songs.length) return; // 等 loadSongsLocal/syncFromGAS 完成
+  const lastId = localStorage.getItem(LS.current);
+  if (!lastId) return;
+  const s = State.songs.find(x => x.id === lastId);
+  if (!s) return;
+  _restored = true;
+  State.currentId = lastId;
+  setNpTitle(s.title || ''); $('#np-artist').textContent = s.artist || '';
+  const art = $('#np-art'); if (art) art.classList.remove('empty');
+  const va = $('#vinyl-art'); if (va) va.style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
+  parseLyrics(s.lrc || '');
+  // 若 player 已就緒,cue 進去等使用者按 ▶ 即從上次秒數續播
+  if (State.ready && State.player && State.player.cueVideoById) {
+    const lastSeek = +localStorage.getItem('song.lastSeek') || 0;
+    try { State.player.cueVideoById({ videoId: s.videoId, startSeconds: lastSeek }); } catch(_){}
+    applySongVolume(s);
+  }
+}
 function setNpTitle(text) {
   const t = $('#np-title');
   if (!t) return;
@@ -3176,15 +3190,7 @@ async function init() {
   // 補分類:沒 lang/gender 的限速跑(每 1.2s 一首,避免 Gemini quota)
   const needClassify = State.songs.filter(s => !s.lang || !s.gender);
   needClassify.forEach((s, i) => setTimeout(() => autoClassify(s).then(() => { if (i === needClassify.length - 1) { renderClassifyTabs(); renderLibrary(); } }), i * 1200));
-  const lastId = localStorage.getItem(LS.current);
-  if (lastId && State.songs.some(s => s.id === lastId)) {
-    const s = State.songs.find(x => x.id === lastId);
-    State.currentId = lastId;
-    setNpTitle(s.title || ''); $('#np-artist').textContent = s.artist || '';
-    const art = $('#np-art'); art.classList.remove('empty');
-    $('#vinyl-art').style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
-    parseLyrics(s.lrc || '');
-  }
+  restoreLastSong();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
       reg.update();
