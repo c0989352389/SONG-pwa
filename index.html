@@ -1323,6 +1323,11 @@ window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 
 function onPlayerState(e) {
   const s = e.data;
+  // 任何狀態變化都嘗試更新 duration(避免 cue/pause 狀態下無法拖動進度條)
+  if (State.player && State.player.getDuration) {
+    const d = State.player.getDuration() || 0;
+    if (d && d !== State.duration) { State.duration = d; $('#np-dur').textContent = fmt(d); drawAbMarkers(); }
+  }
   if (s === YT.PlayerState.PLAYING) {
     State.isPlaying = true; $('#btn-play').textContent = '⏸';
     $('#np-art').classList.add('playing');
@@ -2986,10 +2991,16 @@ function bind() {
     State.player.seekTo(State.duration * pct, true);
   }
   bar.addEventListener('pointerdown', e => {
-    if (!State.duration) return;
+    // 嘗試即時取 duration(可能還在 CUED/PAUSED 狀態,但 YT API 已能回 duration)
+    if (!State.duration && State.player && State.player.getDuration) {
+      State.duration = State.player.getDuration() || 0;
+      if (State.duration) $('#np-dur').textContent = fmt(State.duration);
+    }
+    if (!State.duration) { toast('歌曲尚未載入完成'); return; }
+    e.preventDefault();
     State.dragging = true;
     bar.classList.add('dragging');
-    bar.setPointerCapture(e.pointerId);
+    try { bar.setPointerCapture(e.pointerId); } catch(_){}
     previewSeek(barPct(e.clientX));
   });
   bar.addEventListener('pointermove', e => {
