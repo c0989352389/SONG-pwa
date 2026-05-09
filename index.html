@@ -1956,8 +1956,8 @@ function renderLibrary(filter='') {
   list.innerHTML = items.map(s => `
     <div class="song-row ${s.id === State.currentId ? 'playing' : ''}" data-id="${s.id}" draggable="true">
       ${sortable ? '<span class="drag-h" title="按住拖曳排序">⋮⋮</span>' : ''}
-      <img src="${s.thumb || ''}" alt="" loading="lazy" onerror="this.style.opacity='.2'">
-      <div class="song-info">
+      <img src="${s.thumb || ''}" alt="" loading="lazy" onerror="this.style.opacity='.2'" data-act="play" title="點圖播放" style="cursor:pointer">
+      <div class="song-info" data-act="edit" title="點此編輯">
         <div class="song-title">${escapeHtml(s.title || '(未命名)')}</div>
         <div class="song-meta">
           ${s.artist ? `<span>${escapeHtml(s.artist)}</span>` : ''}
@@ -1965,9 +1965,7 @@ function renderLibrary(filter='') {
           ${s.playCount ? `<span>▶ ${s.playCount}</span>` : ''}
         </div>
       </div>
-      <div class="song-act">
-        <button data-act="more" title="更多">⋯</button>
-      </div>
+      <button class="btn pri sm" data-act="play" title="播放" style="flex-shrink:0">▶</button>
     </div>`).join('') +
     (totalPages > 1 ? `<div style="display:flex;gap:8px;margin:14px 0;align-items:center;justify-content:center">
       <button class="btn dim sm" id="lib-prev" ${State.libPage===0?'disabled':''}>← 上一頁</button>
@@ -1975,12 +1973,14 @@ function renderLibrary(filter='') {
       <button class="btn dim sm" id="lib-next" ${State.libPage>=totalPages-1?'disabled':''}>下一頁 →</button>
     </div>` : '');
   list.querySelectorAll('.song-row').forEach(row => {
-    row.addEventListener('click', e => {
-      if (e.target.closest('[data-act]')) return;
+    row.querySelectorAll('[data-act="play"]').forEach(el => el.addEventListener('click', e => {
+      e.stopPropagation();
       playSong(row.dataset.id); switchPage('player');
-    });
-    const more = row.querySelector('[data-act="more"]');
-    if (more) more.addEventListener('click', e => { e.stopPropagation(); openSongSheet(row.dataset.id); });
+    }));
+    row.querySelectorAll('[data-act="edit"]').forEach(el => el.addEventListener('click', e => {
+      e.stopPropagation();
+      openSongSheet(row.dataset.id);
+    }));
     // 為跨 tab 拖曳設置 dataTransfer
     row.addEventListener('dragstart', e => {
       window._dragSongId = row.dataset.id;
