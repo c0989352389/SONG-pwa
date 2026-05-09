@@ -239,6 +239,11 @@ body.mode-lyrics #np-vis{display:none}
 .song-row .drag-h{color:var(--text3);font-size:14px;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-2px}
 .song-row .drag-h:active{cursor:grabbing}
 .pl-tab.drop-target{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;transform:scale(1.06)}
+.artist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.artist-card{background:var(--glass);border:1px solid var(--glass-br);border-radius:14px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .18s;font-size:13px;font-weight:600;color:var(--text);position:relative;overflow:hidden}
+.artist-card:hover{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 24%,var(--glass)),color-mix(in srgb,var(--accent2) 24%,var(--glass)));border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 30%,transparent)}
+.artist-card .rk{position:absolute;top:4px;left:6px;font-size:10px;color:var(--text3);font-weight:400}
+.artist-card .nm{margin-top:4px}
 .song-row img{width:50px;height:50px;border-radius:8px;object-fit:cover;flex-shrink:0;background:rgba(0,0,0,.3)}
 .song-info{flex:1;min-width:0}
 .song-title{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
@@ -464,16 +469,21 @@ body.mode-lyrics #np-vis{display:none}
         <button data-tab="url">🔗 網址</button>
       </div>
       <div id="tab-recommend">
-        <div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
-          AI 分析你最常聽的歌風格,推薦相似新歌。可在下方加註想要的風格。
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">熱門歌手 Top 20,點擊直接搜尋</div>
+          <button class="btn dim sm" id="btn-refresh-artists" title="重新整理">⟳</button>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="text" id="rec-seed" placeholder="額外風格(選填) 例:日語抒情、搖滾、80年代" style="flex:1">
-          <button class="btn pri" id="btn-load-rec">取得推薦</button>
+        <div id="hot-artists" class="artist-grid">
+          <div class="empty"><div class="empty-i">🔥</div><div class="empty-t"><span class="spinner"></span> 載入中…</div></div>
         </div>
-        <div class="results" id="rec-results">
-          <div class="empty"><div class="empty-i">✨</div><div class="empty-t">按上方「取得推薦」依你的歌單口味推薦新歌</div></div>
-        </div>
+        <details style="margin-top:14px">
+          <summary style="font-size:12px;color:var(--text3);cursor:pointer">✨ 依你的口味 AI 推薦</summary>
+          <div style="display:flex;gap:8px;margin:10px 0">
+            <input type="text" id="rec-seed" placeholder="額外風格(選填) 例:日語抒情、搖滾、80年代" style="flex:1">
+            <button class="btn pri" id="btn-load-rec">取得推薦</button>
+          </div>
+          <div class="results" id="rec-results"></div>
+        </details>
       </div>
       <div id="tab-search" style="display:none">
         <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -1873,19 +1883,39 @@ async function createPlaylist() {
 }
 
 //============== Add song ==============
+// 排除這些關鍵字(明顯非單曲)
+const SEARCH_BLOCK_RE = /串燒|medley|mashup|混音輯|混音帶|合輯|合集|精選輯|專輯試聽|全專輯|full\s*album|全集|reaction|react\b|教學|tutorial|how\s*to\s*sing|一小時|1\s*hour|10\s*minutes?|10\s*分鐘|無限循環|loop\s*版|純人聲|ai\s*cover|翻唱|cover\s*by|cover版/i;
+// 加分(高音質/官方)
+const SEARCH_BOOST_RE = /官方|official|m\/?v\b|music\s*video|高音質|hi[-\s]?res|無損|hd\b|hq\b|4k|lossless|歌詞版|lyrics?/i;
+const SEARCH_VEVO_RE = /VEVO/i;
+function _ytScore(it) {
+  const t = it.title || '', c = it.artist || '';
+  let score = 0;
+  if (SEARCH_BOOST_RE.test(t)) score += 3;
+  if (SEARCH_VEVO_RE.test(c)) score += 4;
+  if (/官方|official/i.test(c)) score += 3;
+  if (/topic/i.test(c)) score += 2; // YouTube auto-Topic 頻道通常是純音檔
+  // 過長標題通常是合輯
+  if (t.length > 60) score -= 2;
+  return score;
+}
 async function searchYouTube(q, pageToken) {
   if (!State.settings.ytKey) { toast('請先到 ⚙ 設定 YouTube API Key'); return []; }
-  let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(q)}&key=${State.settings.ytKey}`;
+  let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=25&q=${encodeURIComponent(q)}&key=${State.settings.ytKey}`;
   if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
   const r = await fetch(url);
   if (!r.ok) { toast('搜尋失敗 ' + r.status); return []; }
   const j = await r.json();
-  const items = (j.items || [])
+  let items = (j.items || [])
     .filter(it => it && it.id && it.id.videoId)
     .map(it => ({
       videoId: it.id.videoId, title: it.snippet.title, artist: it.snippet.channelTitle,
       thumb: (it.snippet.thumbnails.medium || it.snippet.thumbnails.default).url
-    }));
+    }))
+    .filter(it => !SEARCH_BLOCK_RE.test(it.title));
+  // 依品質分數排序,取前 12
+  items.sort((a,b) => _ytScore(b) - _ytScore(a));
+  items = items.slice(0, 12);
   items.nextPageToken = j.nextPageToken || '';
   return items;
 }
@@ -2011,6 +2041,61 @@ ${seed ? '\n使用者額外要求風格: ' + seed : ''}
     }
     throw new Error('AI 格式仍不對: ' + e.message);
   }
+}
+
+// ===== Hot Artists Top 20 =====
+const HOT_ARTISTS_KEY = 'hot_artists_v1';
+const FALLBACK_ARTISTS = [
+  '周杰倫','蔡依林','五月天','林俊傑','田馥甄','鄧紫棋','告五人','茄子蛋','韋禮安','八三夭',
+  '陳奕迅','蕭敬騰','張惠妹','孫燕姿','周興哲','玖壹壹','米津玄師','宇多田光','IU','NewJeans'
+];
+function _readHotArtists() {
+  try {
+    const raw = localStorage.getItem(HOT_ARTISTS_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw);
+    if (Date.now() - (j.ts||0) > 24*3600*1000) return null;
+    if (!Array.isArray(j.list) || !j.list.length) return null;
+    return j.list;
+  } catch(_) { return null; }
+}
+async function _fetchHotArtistsFromAI() {
+  if (!State.settings.geminiKey) return null;
+  if (_geminiCooldownLeft() > 0) return null;
+  const prompt = `列出目前(本月)台灣 / 華語 / 日韓 樂壇最熱門/最常被搜尋的 20 位歌手或團體名稱。
+要求:
+- 純歌手/團體名,不要曲名
+- 中港台日韓混合,以華語為主(約 12-14 位),日韓 6-8 位
+- 涵蓋資深天王天后與當紅新生代
+- 一行一個,不要編號、不要說明、不要任何符號
+僅輸出 20 行歌手名,不要其他內容。`;
+  try {
+    const text = await gemini(prompt, { temp: 0.6, max: 600, googleSearch: true });
+    const list = String(text).split(/\r?\n/).map(s => s.replace(/^[\d.\s\-•*]+/, '').trim()).filter(s => s && s.length < 30);
+    if (list.length >= 12) return list.slice(0, 20);
+  } catch(e) { console.warn('hot artists ai', e); }
+  return null;
+}
+async function loadHotArtists(force) {
+  const grid = $('#hot-artists');
+  let list = force ? null : _readHotArtists();
+  if (!list) {
+    grid.innerHTML = '<div class="empty"><div class="empty-t"><span class="spinner"></span> 載入熱門歌手…</div></div>';
+    list = await _fetchHotArtistsFromAI();
+    if (!list) list = FALLBACK_ARTISTS;
+    localStorage.setItem(HOT_ARTISTS_KEY, JSON.stringify({ ts: Date.now(), list }));
+  }
+  grid.innerHTML = list.map((n, i) => `<div class="artist-card" data-name="${escapeHtml(n)}"><div class="rk">${i+1}</div><div class="nm">${escapeHtml(n)}</div></div>`).join('');
+  grid.querySelectorAll('.artist-card').forEach(c => c.addEventListener('click', () => {
+    const name = c.dataset.name;
+    // 切到搜尋 tab
+    $$('.search-tabs button').forEach(x => x.classList.toggle('active', x.dataset.tab === 'search'));
+    $('#tab-recommend').style.display = 'none';
+    $('#tab-search').style.display = '';
+    $('#tab-url').style.display = 'none';
+    $('#yt-q').value = name;
+    $('#btn-yt-search').click();
+  }));
 }
 
 async function loadRecommendations(seed) {
@@ -2175,6 +2260,13 @@ function switchMode(m) {
 function switchPage(name) {
   $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
   $$('.nb').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+  if (name === 'add') {
+    const grid = $('#hot-artists');
+    if (grid && !grid.dataset.loaded) {
+      grid.dataset.loaded = '1';
+      loadHotArtists(false);
+    }
+  }
 }
 
 //============== Bind ==============
@@ -2268,7 +2360,12 @@ function bind() {
     $('#tab-recommend').style.display = b.dataset.tab === 'recommend' ? '' : 'none';
     $('#tab-search').style.display = b.dataset.tab === 'search' ? '' : 'none';
     $('#tab-url').style.display = b.dataset.tab === 'url' ? '' : 'none';
+    if (b.dataset.tab === 'recommend' && !$('#hot-artists').dataset.loaded) {
+      $('#hot-artists').dataset.loaded = '1';
+      loadHotArtists(false);
+    }
   }));
+  $('#btn-refresh-artists').addEventListener('click', () => loadHotArtists(true));
   $('#btn-load-rec').addEventListener('click', () => loadRecommendations($('#rec-seed').value.trim()));
   $('#rec-seed').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-load-rec').click(); });
   $('#btn-yt-search').addEventListener('click', async () => {
