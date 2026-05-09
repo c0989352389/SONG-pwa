@@ -431,6 +431,9 @@ body.mode-lyrics #np-art{display:none}
         </div>
 
         <div class="tool-bar">
+          <button class="tool-btn" id="btn-volume" title="音量平衡" aria-label="音量平衡">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+          </button>
           <button class="tool-btn" id="btn-voice" title="語音控制" aria-label="語音控制">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
           </button>
@@ -628,6 +631,29 @@ body.mode-lyrics #np-art{display:none}
     </div>
   </div>
 
+  <!-- Volume balance -->
+  <div class="modal" id="modal-vol">
+    <div class="modal-card">
+      <div class="modal-h"><h3>🔊 音量平衡</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+        全域基準音量 + 各首微調補償,讓所有歌音量平衡。
+      </div>
+      <div class="modal-row">
+        <label>基準音量 <span id="base-vol-lbl" style="color:var(--accent2)">70</span></label>
+        <input type="range" id="base-vol" min="0" max="100" value="70" style="width:100%">
+      </div>
+      <div class="modal-row">
+        <label>本首補償 <span id="off-vol-lbl" style="color:var(--accent2)">0</span> (-30 ~ +30)</label>
+        <input type="range" id="off-vol" min="-30" max="30" value="0" style="width:100%">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">原音較大聲 → 設負值;較小聲 → 設正值</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn dim" id="btn-vol-reset">本首歸零</button>
+        <button class="btn pri" data-close>完成</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Edit song name -->
   <div class="modal" id="modal-edit">
     <div class="modal-card">
@@ -689,7 +715,7 @@ body.mode-lyrics #np-art{display:none}
 'use strict';
 
 const LS = {
-  songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode', shuffle:'song.shuffle', repeat:'song.repeat', langF:'song.langF', genderF:'song.genderF'
+  songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode', shuffle:'song.shuffle', repeat:'song.repeat', langF:'song.langF', genderF:'song.genderF', baseVol:'song.baseVol'
 };
 const DEFAULT_SETTINGS = { ytKey:'', geminiKey:'', gasUrl:'', lang:'zh-TW' };
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -1369,11 +1395,34 @@ function playSong(id) {
   // 隨機主題:換歌時換新色
   if (State.ready && State.player && State.player.loadVideoById) {
     State.player.loadVideoById(s.videoId);
-    setTimeout(()=>{ try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 600);
+    setTimeout(() => {
+      try {
+        State.player.setPlaybackRate(State.speed);
+        State.player.playVideo();      // 確保自動播放
+        applySongVolume(s);            // 套用該首歌的音量偏移(平衡)
+      } catch(_){}
+    }, 600);
   } else {
     setTimeout(()=>playSong(id), 500); return;
   }
   renderLibrary();
+}
+// ===== 音量平衡 =====
+const DEFAULT_BASE_VOL = 70;
+function applySongVolume(s) {
+  if (!State.player || !State.player.setVolume) return;
+  const base = (typeof State.baseVolume === 'number') ? State.baseVolume : DEFAULT_BASE_VOL;
+  const offset = (s && typeof s.volOffset === 'number') ? s.volOffset : 0;
+  const v = Math.max(0, Math.min(100, base + offset));
+  try { State.player.setVolume(v); } catch(_){}
+}
+function openVolModal() {
+  const s = getCur();
+  const base = (typeof State.baseVolume === 'number') ? State.baseVolume : DEFAULT_BASE_VOL;
+  const off = (s && typeof s.volOffset === 'number') ? s.volOffset : 0;
+  $('#base-vol').value = base; $('#base-vol-lbl').textContent = base;
+  $('#off-vol').value = off; $('#off-vol-lbl').textContent = (off>=0?'+':'') + off;
+  $('#modal-vol').classList.add('show');
 }
 
 function togglePlay() {
@@ -2830,6 +2879,31 @@ function bind() {
   const ntw = document.querySelector('.np-title-wrap');
   if (ntw) ntw.addEventListener('click', () => { if (State.currentId) openSongSheet(State.currentId); });
   $('#btn-edit-save').addEventListener('click', saveEditSong);
+  // 音量平衡
+  $('#btn-volume').addEventListener('click', openVolModal);
+  $('#base-vol').addEventListener('input', e => {
+    State.baseVolume = +e.target.value;
+    localStorage.setItem(LS.baseVol, String(State.baseVolume));
+    $('#base-vol-lbl').textContent = State.baseVolume;
+    const s = getCur(); if (s) applySongVolume(s);
+  });
+  $('#off-vol').addEventListener('input', e => {
+    const s = getCur(); if (!s) return;
+    s.volOffset = +e.target.value;
+    $('#off-vol-lbl').textContent = (s.volOffset>=0?'+':'') + s.volOffset;
+    applySongVolume(s);
+  });
+  $('#off-vol').addEventListener('change', () => {
+    const s = getCur(); if (s) { saveSongsLocal(); pushSongToCloud(s); }
+  });
+  $('#btn-vol-reset').addEventListener('click', () => {
+    const s = getCur(); if (!s) return;
+    s.volOffset = 0;
+    $('#off-vol').value = 0;
+    $('#off-vol-lbl').textContent = '0';
+    applySongVolume(s);
+    saveSongsLocal(); pushSongToCloud(s);
+  });
   $('#edit-title').addEventListener('input', _refreshEditWarn);
   $('#edit-artist').addEventListener('input', _refreshEditWarn);
 
@@ -2986,6 +3060,7 @@ async function init() {
   switchMode(localStorage.getItem(LS.viewMode) || 'vinyl');
   State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
   State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
+  State.baseVolume = Math.min(100, Math.max(0, +localStorage.getItem(LS.baseVol) || DEFAULT_BASE_VOL));
   updatePlayModeUI();
   if (State.settings.gasUrl) await syncFromGAS();
   // 自動補上歌手標籤(只處理沒 tag 但有 artist 的)
