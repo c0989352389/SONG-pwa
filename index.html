@@ -1933,6 +1933,25 @@ function renderPlaylistTabs() {
     });
   });
   $('#btn-pl-mgr').addEventListener('click', openPlMgr);
+  // 拖曳重排歌單 tab(僅排序自訂歌單,「全部」與「+ 管理」不動)
+  if (window.Sortable) {
+    if (tabs._sortable) try { tabs._sortable.destroy(); } catch(_){}
+    tabs._sortable = window.Sortable.create(tabs, {
+      animation: 150,
+      filter: '[data-id="all"], #btn-pl-mgr',
+      preventOnFilter: false,
+      delay: 200, delayOnTouchOnly: true, touchStartThreshold: 5,
+      forceFallback: true, fallbackTolerance: 5,
+      onEnd: () => {
+        const order = Array.from(tabs.querySelectorAll('[data-id]')).map(b => b.dataset.id).filter(id => id !== 'all');
+        order.forEach((id, i) => { const p = State.playlists.find(x => x.id === id); if (p) p.sortOrder = i; });
+        savePlaylistsLocal();
+        if (State.settings.gasUrl) {
+          State.playlists.forEach((p, i) => setTimeout(() => gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder||0, '顏色': p.color || '' }).catch(()=>{}), i * 200));
+        }
+      }
+    });
+  }
 }
 function renderLibrary(filter='') {
   const list = $('#lib-list');
