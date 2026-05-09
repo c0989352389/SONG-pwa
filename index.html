@@ -126,10 +126,10 @@ body.mode-vinyl .gc{display:none}
 body.mode-video .gc{display:none}
 /* 歌詞模式時藏起唱片(節省空間,只顯示歌詞) */
 body.mode-lyrics #np-art{display:none}
-/* 歌詞模式:把 .gc 撐滿,lrc-tune 黏在底部不被擠出畫面 */
-body.mode-lyrics .gc{display:flex;flex-direction:column;height:calc(100dvh - 320px);min-height:380px}
-body.mode-lyrics .lyr-box{flex:1 1 auto;max-height:none}
-body.mode-lyrics .lrc-tune{flex-shrink:0;position:sticky;bottom:0;background:rgba(15,15,22,.85);backdrop-filter:blur(14px);padding:8px;border-radius:14px;border:1px solid var(--glass-br);z-index:6;margin-top:6px}
+/* 歌詞模式:.gc 限高,歌詞框不捲動,lrc-tune 維持原位置 */
+body.mode-lyrics .gc{display:flex;flex-direction:column;height:calc(100dvh - 220px);min-height:280px;overflow:hidden}
+body.mode-lyrics .lyr-box{flex:1 1 auto;max-height:none;overflow:hidden}
+body.mode-lyrics .lrc-tune{flex-shrink:0}
 /* 假全螢幕(iOS 友善) */
 body.fake-fs #page-player{position:fixed;inset:0;z-index:9999;background:#000;padding:0;overflow:hidden}
 body.fake-fs #page-player .np-stage{height:100dvh;display:flex;flex-direction:column;justify-content:center}
