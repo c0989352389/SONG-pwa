@@ -676,8 +676,17 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
   <div class="modal" id="modal-pl">
     <div class="modal-card">
       <div class="modal-h"><h3>📁 我的歌單分類</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">⚡ 快速建立</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="pl-quick">
+        <span class="chip" data-pl-quick="國語">國語</span>
+        <span class="chip" data-pl-quick="台語">台語</span>
+        <span class="chip" data-pl-quick="其他語言">其他語言</span>
+        <span class="chip" data-pl-quick="男歌星">♂ 男歌星</span>
+        <span class="chip" data-pl-quick="女歌星">♀ 女歌星</span>
+        <span class="chip" data-pl-quick="團體">團體</span>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input type="text" id="pl-new-name" placeholder="✚ 新分類名稱" style="flex:1">
+        <input type="text" id="pl-new-name" placeholder="✚ 自訂分類名稱" style="flex:1">
         <button class="btn pri" id="btn-pl-create">建立</button>
       </div>
       <div style="margin-bottom:10px">
@@ -3164,6 +3173,16 @@ function bind() {
   $('#btn-pl-create').addEventListener('click', createPlaylist);
   $('#pl-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createPlaylist(); });
   $('#pl-search').addEventListener('input', () => { _plMgrPage = 0; renderPlMgr(); });
+  document.querySelectorAll('[data-pl-quick]').forEach(c => c.addEventListener('click', async () => {
+    const name = c.dataset.plQuick;
+    const exist = State.playlists.find(p => String(p.name||'').trim().toLowerCase() === name.toLowerCase());
+    if (exist) { toast('已有「' + name + '」'); return; }
+    const p = { id: uid('pl'), name, sortOrder: State.playlists.length, color: '' };
+    State.playlists.push(p); savePlaylistsLocal();
+    if (State.settings.gasUrl) gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': '' }).catch(()=>{});
+    renderPlaylistTabs(); renderPlMgr();
+    toast('已建立「' + name + '」');
+  }));
 
   $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('show')));
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
