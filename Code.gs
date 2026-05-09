@@ -9,7 +9,7 @@
 const SHEET_ID = '1THqrOQNwSGeYrlVvx9j928iEwptESlH-pvdyMxMfLMU';
 
 const SONGS_SHEET = '歌單';
-const SONGS_HEADER = ['ID','歌名','歌手','YouTubeID','縮圖','時長','加入時間','標籤','播放次數','最後播放','歌詞LRC','備註','翻譯JSON','解釋JSON','段落JSON','歌單IDs','BPM','歌詞偏移'];
+const SONGS_HEADER = ['ID','歌名','歌手','YouTubeID','縮圖','時長','加入時間','標籤','播放次數','最後播放','歌詞LRC','備註','翻譯JSON','解釋JSON','段落JSON','歌單IDs','BPM','歌詞偏移','歌單內排序JSON'];
 
 const PL_SHEET = '歌單分組';
 const PL_HEADER = ['ID','名稱','排序','顏色'];

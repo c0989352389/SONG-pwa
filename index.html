@@ -235,6 +235,10 @@ body.mode-lyrics #np-vis{display:none}
 .song-row{display:flex;align-items:center;gap:11px;padding:9px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-br);margin-bottom:7px;cursor:pointer;transition:all .15s;backdrop-filter:blur(10px)}
 .song-row:hover{background:rgba(255,255,255,.09);border-color:var(--glass-st)}
 .song-row.playing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px color-mix(in srgb, var(--accent) 25%, transparent)}
+.song-row.dragging{opacity:.4}
+.song-row .drag-h{color:var(--text3);font-size:14px;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-2px}
+.song-row .drag-h:active{cursor:grabbing}
+.pl-tab.drop-target{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;transform:scale(1.06)}
 .song-row img{width:50px;height:50px;border-radius:8px;object-fit:cover;flex-shrink:0;background:rgba(0,0,0,.3)}
 .song-info{flex:1;min-width:0}
 .song-title{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
@@ -609,6 +613,7 @@ body.mode-lyrics #np-vis{display:none}
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 'use strict';
 
@@ -735,6 +740,7 @@ function gasFromCloudSong(s) {
     playlistIds: tryParse(s['歌單IDs']) || (s['歌單IDs'] ? String(s['歌單IDs']).split(',').filter(Boolean) : []),
     bpm: Number(s['BPM'])||0,
     lrcOffset: Number(s['歌詞偏移'])||0,
+    orderInPl: tryParse(s['歌單內排序JSON']) || {},
   };
 }
 async function syncFromGAS() {
@@ -888,7 +894,8 @@ function pushSongToCloud(s) {
     '標籤': s.tag, '備註': s.note, '歌詞LRC': s.lrc,
     '翻譯JSON': JSON.stringify(s.translations||{}), '解釋JSON': JSON.stringify(s.explanations||{}),
     '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
-    'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0
+    'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0,
+    '歌單內排序JSON': JSON.stringify(s.orderInPl||{})
   }).catch(e => console.warn('push', e));
 }
 
@@ -1619,35 +1626,75 @@ function stopThemeCycle() {
 }
 
 //============== Library / Playlists ==============
+const LIB_PAGE_SIZE = 30;
+State.libPage = 0;
+let _sortableInst = null;
+function _orderKey(s, plId) {
+  const v = s.orderInPl && s.orderInPl[plId];
+  return (typeof v === 'number') ? v : 999999;
+}
 function visibleSongs() {
   if (State.currentPlaylistId === 'all') return State.songs;
-  return State.songs.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(State.currentPlaylistId));
+  const pid = State.currentPlaylistId;
+  return State.songs
+    .filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(pid))
+    .sort((a,b) => _orderKey(a, pid) - _orderKey(b, pid));
 }
 function renderPlaylistTabs() {
   const tabs = $('#pl-tabs');
   const pls = [{ id:'all', name:'全部' }, ...State.playlists.sort((a,b)=>a.sortOrder-b.sortOrder)];
   tabs.innerHTML = pls.map(p => `<button class="pl-tab ${p.id===State.currentPlaylistId?'active':''}" data-id="${p.id}">${escapeHtml(p.name)}</button>`).join('') +
     `<button class="pl-tab add" id="btn-pl-mgr">＋ 管理</button>`;
-  tabs.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => {
-    State.currentPlaylistId = b.dataset.id;
-    localStorage.setItem(LS.currentPl, b.dataset.id);
-    renderPlaylistTabs(); renderLibrary();
-  }));
+  tabs.querySelectorAll('[data-id]').forEach(b => {
+    b.addEventListener('click', () => {
+      State.currentPlaylistId = b.dataset.id;
+      State.libPage = 0;
+      localStorage.setItem(LS.currentPl, b.dataset.id);
+      renderPlaylistTabs(); renderLibrary();
+    });
+    // 拖曳到 tab → 加入該歌單
+    b.addEventListener('dragover', e => { if (window._dragSongId) { e.preventDefault(); b.classList.add('drop-target'); } });
+    b.addEventListener('dragleave', () => b.classList.remove('drop-target'));
+    b.addEventListener('drop', e => {
+      e.preventDefault(); b.classList.remove('drop-target');
+      const sid = window._dragSongId; if (!sid) return;
+      const s = State.songs.find(x => x.id === sid); if (!s) return;
+      const targetPl = b.dataset.id;
+      if (targetPl === 'all') return;
+      s.playlistIds = s.playlistIds || [];
+      if (s.playlistIds.includes(targetPl)) { toast('已在「' + State.playlists.find(p=>p.id===targetPl)?.name + '」'); return; }
+      s.playlistIds.push(targetPl);
+      // 排到該歌單末尾
+      s.orderInPl = s.orderInPl || {};
+      const maxOrd = Math.max(-1, ...State.songs.filter(x => x.playlistIds && x.playlistIds.includes(targetPl) && x.id !== sid).map(x => _orderKey(x, targetPl)).filter(v => v < 999999));
+      s.orderInPl[targetPl] = maxOrd + 1;
+      saveSongsLocal(); pushSongToCloud(s);
+      toast('已加入「' + State.playlists.find(p=>p.id===targetPl)?.name + '」');
+      renderLibrary();
+    });
+  });
   $('#btn-pl-mgr').addEventListener('click', openPlMgr);
 }
 function renderLibrary(filter='') {
   const list = $('#lib-list');
   const q = (filter || $('#lib-q').value || '').trim().toLowerCase();
-  const items = visibleSongs().filter(s => {
+  const all = visibleSongs().filter(s => {
     if (!q) return true;
     return [s.title, s.artist, s.tag].filter(Boolean).join(' ').toLowerCase().includes(q);
   });
-  if (!items.length) {
-    list.innerHTML = `<div class="empty"><div class="empty-i">♫</div><div class="empty-t">${State.songs.length ? '沒有符合的歌曲' : '歌單是空的，到「加歌」開始'}</div></div>`;
+  if (!all.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-i">♫</div><div class="empty-t">${State.songs.length ? '沒有符合的歌曲' : '歌單是空的,到「加歌」開始'}</div></div>`;
     return;
   }
+  const totalPages = Math.max(1, Math.ceil(all.length / LIB_PAGE_SIZE));
+  if (State.libPage >= totalPages) State.libPage = totalPages - 1;
+  if (State.libPage < 0) State.libPage = 0;
+  const start = State.libPage * LIB_PAGE_SIZE;
+  const items = all.slice(start, start + LIB_PAGE_SIZE);
+  const isInPl = State.currentPlaylistId !== 'all' && !q;
   list.innerHTML = items.map(s => `
-    <div class="song-row ${s.id === State.currentId ? 'playing' : ''}" data-id="${s.id}">
+    <div class="song-row ${s.id === State.currentId ? 'playing' : ''}" data-id="${s.id}" draggable="true">
+      ${isInPl ? '<span class="drag-h" title="拖曳排序">⋮⋮</span>' : ''}
       <img src="${s.thumb || ''}" alt="" loading="lazy" onerror="this.style.opacity='.2'">
       <div class="song-info">
         <div class="song-title">${escapeHtml(s.title || '(未命名)')}</div>
@@ -1660,7 +1707,12 @@ function renderLibrary(filter='') {
       <div class="song-act">
         <button data-act="more" title="更多">⋯</button>
       </div>
-    </div>`).join('');
+    </div>`).join('') +
+    (totalPages > 1 ? `<div style="display:flex;gap:8px;margin:14px 0;align-items:center;justify-content:center">
+      <button class="btn dim sm" id="lib-prev" ${State.libPage===0?'disabled':''}>← 上一頁</button>
+      <span style="font-size:12px;color:var(--text3)">${State.libPage+1} / ${totalPages} 頁(共 ${all.length} 首)</span>
+      <button class="btn dim sm" id="lib-next" ${State.libPage>=totalPages-1?'disabled':''}>下一頁 →</button>
+    </div>` : '');
   list.querySelectorAll('.song-row').forEach(row => {
     row.addEventListener('click', e => {
       if (e.target.closest('[data-act]')) return;
@@ -1668,6 +1720,44 @@ function renderLibrary(filter='') {
     });
     const more = row.querySelector('[data-act="more"]');
     if (more) more.addEventListener('click', e => { e.stopPropagation(); openSongSheet(row.dataset.id); });
+    // 為跨 tab 拖曳設置 dataTransfer
+    row.addEventListener('dragstart', e => {
+      window._dragSongId = row.dataset.id;
+      try { e.dataTransfer.setData('text/plain', row.dataset.id); e.dataTransfer.effectAllowed = 'copyMove'; } catch(_){}
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => { window._dragSongId = null; row.classList.remove('dragging'); });
+  });
+  const prev = list.querySelector('#lib-prev'); if (prev) prev.onclick = () => { State.libPage--; renderLibrary(); };
+  const next = list.querySelector('#lib-next'); if (next) next.onclick = () => { State.libPage++; renderLibrary(); };
+  // 在特定歌單時啟用拖曳排序
+  if (_sortableInst) { try { _sortableInst.destroy(); } catch(_){} _sortableInst = null; }
+  if (isInPl && window.Sortable) {
+    _sortableInst = window.Sortable.create(list, {
+      animation: 150,
+      handle: '.drag-h',
+      filter: 'button, [data-act]',
+      preventOnFilter: false,
+      onEnd: () => _persistOrderFromDom(),
+    });
+  }
+}
+function _persistOrderFromDom() {
+  const pid = State.currentPlaylistId;
+  if (pid === 'all') return;
+  const list = $('#lib-list');
+  const rows = Array.from(list.querySelectorAll('.song-row[data-id]'));
+  const start = State.libPage * LIB_PAGE_SIZE;
+  rows.forEach((row, i) => {
+    const s = State.songs.find(x => x.id === row.dataset.id);
+    if (!s) return;
+    s.orderInPl = s.orderInPl || {};
+    s.orderInPl[pid] = start + i;
+  });
+  saveSongsLocal();
+  rows.forEach(row => {
+    const s = State.songs.find(x => x.id === row.dataset.id);
+    if (s) pushSongToCloud(s);
   });
 }
 function openSongSheet(id) {
@@ -1799,7 +1889,7 @@ async function searchYouTube(q, pageToken) {
   items.nextPageToken = j.nextPageToken || '';
   return items;
 }
-const YT_SEARCH_STATE = { q:'', token:'', appending:false };
+const YT_SEARCH_STATE = { q:'', pages:[], tokens:[''], idx:0, loading:false };
 function _renderYTRow(it, existingVids) {
   const dup = existingVids.has(it.videoId);
   return `<div class="result-row">
@@ -1821,26 +1911,40 @@ function _bindYTRowButtons(list) {
     });
   });
 }
-async function ytSearchMore() {
-  if (!YT_SEARCH_STATE.token || YT_SEARCH_STATE.appending) return;
-  YT_SEARCH_STATE.appending = true;
+function _renderYTPage() {
   const list = $('#yt-results');
-  const moreBtn = list.querySelector('#yt-more');
-  if (moreBtn) { moreBtn.disabled = true; moreBtn.textContent = '載入中…'; }
-  let items = [];
-  try { items = await searchYouTube(YT_SEARCH_STATE.q, YT_SEARCH_STATE.token); }
-  catch(e){ if (moreBtn) { moreBtn.disabled = false; moreBtn.textContent = '載入更多'; } toast('載入失敗:' + e.message); YT_SEARCH_STATE.appending = false; return; }
-  YT_SEARCH_STATE.token = items.nextPageToken || '';
+  const st = YT_SEARCH_STATE;
+  const items = st.pages[st.idx] || [];
   const existingVids = new Set(State.songs.map(s => s.videoId));
-  const html = items.map(it => _renderYTRow(it, existingVids)).join('');
-  if (moreBtn) moreBtn.remove();
-  list.insertAdjacentHTML('beforeend', html);
-  if (YT_SEARCH_STATE.token) {
-    list.insertAdjacentHTML('beforeend', '<button class="btn dim" id="yt-more" style="width:100%;margin-top:10px">載入更多</button>');
-    list.querySelector('#yt-more').addEventListener('click', ytSearchMore);
-  }
+  const hasPrev = st.idx > 0;
+  const hasNext = st.tokens[st.idx + 1] !== undefined && st.tokens[st.idx + 1] !== '';
+  const totalKnown = st.pages.length;
+  list.innerHTML = items.map(it => _renderYTRow(it, existingVids)).join('') +
+    `<div style="display:flex;gap:8px;margin-top:12px;align-items:center;justify-content:center">
+      <button class="btn dim sm" id="yt-prev" ${hasPrev?'':'disabled'}>← 上一頁</button>
+      <span style="font-size:12px;color:var(--text3)">第 ${st.idx+1} 頁 / 已載 ${totalKnown}</span>
+      <button class="btn dim sm" id="yt-next" ${hasNext?'':'disabled'}>下一頁 →</button>
+    </div>`;
   _bindYTRowButtons(list);
-  YT_SEARCH_STATE.appending = false;
+  const pb = list.querySelector('#yt-prev'); if (pb) pb.onclick = () => { st.idx--; _renderYTPage(); };
+  const nb = list.querySelector('#yt-next'); if (nb) nb.onclick = ytSearchNext;
+}
+async function ytSearchNext() {
+  const st = YT_SEARCH_STATE;
+  if (st.loading) return;
+  // 已抓過下一頁 → 直接顯示
+  if (st.pages[st.idx + 1]) { st.idx++; _renderYTPage(); return; }
+  const tok = st.tokens[st.idx + 1];
+  if (!tok) return;
+  st.loading = true;
+  let items = [];
+  try { items = await searchYouTube(st.q, tok); }
+  catch(e){ toast('載入失敗:' + e.message); st.loading = false; return; }
+  st.pages.push(items);
+  st.tokens.push(items.nextPageToken || '');
+  st.idx++;
+  st.loading = false;
+  _renderYTPage();
 }
 async function addSong(s) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
@@ -2175,14 +2279,10 @@ function bind() {
     try { items = await searchYouTube(q); } catch(e){ list.innerHTML = '<div class="empty"><div class="empty-t">搜尋失敗:' + escapeHtml(e.message) + '</div></div>'; return; }
     if (!items.length) { list.innerHTML = '<div class="empty"><div class="empty-t">沒結果</div></div>'; return; }
     YT_SEARCH_STATE.q = q;
-    YT_SEARCH_STATE.token = items.nextPageToken || '';
-    const existingVids = new Set(State.songs.map(s => s.videoId));
-    list.innerHTML = items.map(it => _renderYTRow(it, existingVids)).join('');
-    if (YT_SEARCH_STATE.token) {
-      list.insertAdjacentHTML('beforeend', '<button class="btn dim" id="yt-more" style="width:100%;margin-top:10px">載入更多</button>');
-      list.querySelector('#yt-more').addEventListener('click', ytSearchMore);
-    }
-    _bindYTRowButtons(list);
+    YT_SEARCH_STATE.pages = [items];
+    YT_SEARCH_STATE.tokens = ['', items.nextPageToken || ''];
+    YT_SEARCH_STATE.idx = 0;
+    _renderYTPage();
   });
   $('#yt-q').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-yt-search').click(); });
   $('#btn-add-url').addEventListener('click', addByUrl);
