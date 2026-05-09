@@ -412,8 +412,12 @@ body.mode-lyrics #np-vis{display:none}
           <button class="tool-btn" id="btn-edit-lrc" title="編輯歌詞" aria-label="編輯歌詞">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
           </button>
-          <button class="tool-btn" id="btn-shuffle" title="隨機播放" aria-label="隨機播放">
+          <button class="tool-btn" id="btn-shuffle" title="隨機播放(關)" aria-label="隨機播放">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="16,3 21,3 21,8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21,16 21,21 16,21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+          </button>
+          <button class="tool-btn" id="btn-repeat" title="重複播放(關)" aria-label="重複播放">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            <span class="badge" id="repeat-badge" style="display:none">1</span>
           </button>
           <button class="tool-btn" id="btn-speed" title="倍速" aria-label="倍速">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="12,7 12,12 16,14"/><path d="M21 3l-3 3 3 3" opacity=".5"/></svg>
@@ -650,7 +654,7 @@ body.mode-lyrics #np-vis{display:none}
 'use strict';
 
 const LS = {
-  songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode'
+  songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode', shuffle:'song.shuffle', repeat:'song.repeat'
 };
 const DEFAULT_SETTINGS = { ytKey:'', geminiKey:'', gasUrl:'', lang:'zh-TW' };
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -666,6 +670,8 @@ const State = {
   ab: { a: null, b: null, on: false },
   speed: 1, currentTheme: 'default',
   dragging: false,
+  shuffleOn: false,
+  repeatMode: 0, // 0=off 1=one 2=playlist
 };
 
 const $ = s => document.querySelector(s);
@@ -1262,7 +1268,7 @@ function onPlayerState(e) {
     State.isPlaying = false; $('#btn-play').textContent = '▶'; stopProgress();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
     stopThemeCycle();
-    playNext();
+    handleSongEnded();
   }
 }
 
@@ -1322,7 +1328,14 @@ function togglePlay() {
   if (!State.player) return;
   if (State.isPlaying) State.player.pauseVideo(); else State.player.playVideo();
 }
+function _pickRandom() {
+  const list = visibleSongs(); if (!list.length) return null;
+  if (list.length < 2) return list[0];
+  let i; do { i = Math.floor(Math.random()*list.length); } while (list[i].id === State.currentId);
+  return list[i];
+}
 function playNext() {
+  if (State.shuffleOn) { const n = _pickRandom(); if (n) playSong(n.id); return; }
   const list = visibleSongs(); if (!list.length) return;
   const i = list.findIndex(s => s.id === State.currentId);
   const n = list[(i+1) % list.length]; playSong(n.id);
@@ -1332,10 +1345,52 @@ function playPrev() {
   const i = list.findIndex(s => s.id === State.currentId);
   const p = list[(i-1+list.length) % list.length]; playSong(p.id);
 }
-function shuffle() {
-  const list = visibleSongs(); if (list.length < 2) return;
-  let i; do { i = Math.floor(Math.random()*list.length); } while (list[i].id === State.currentId);
-  playSong(list[i].id);
+function handleSongEnded() {
+  // 重複本首
+  if (State.repeatMode === 1) {
+    try { State.player.seekTo(0, true); State.player.playVideo(); } catch(_){}
+    return;
+  }
+  // 隨機
+  if (State.shuffleOn) {
+    const n = _pickRandom(); if (n) playSong(n.id); return;
+  }
+  // 重複整個歌單(包尾繞回)
+  const list = visibleSongs(); if (!list.length) return;
+  const i = list.findIndex(s => s.id === State.currentId);
+  if (State.repeatMode === 2) {
+    const n = list[(i+1) % list.length]; playSong(n.id); return;
+  }
+  // 預設:播完整個歌單就停
+  if (i >= 0 && i < list.length - 1) playSong(list[i+1].id);
+  // else: 已是最後一首,停止
+}
+function toggleShuffle() {
+  State.shuffleOn = !State.shuffleOn;
+  localStorage.setItem(LS.shuffle, State.shuffleOn ? '1' : '0');
+  updatePlayModeUI();
+  toast(State.shuffleOn ? '🔀 重複隨機播放開' : '🔀 隨機關');
+}
+function cycleRepeat() {
+  State.repeatMode = (State.repeatMode + 1) % 3;
+  localStorage.setItem(LS.repeat, String(State.repeatMode));
+  updatePlayModeUI();
+  toast(['重複播放關(整個歌單播完停)', '🔂 重複本首', '🔁 重複整個歌單'][State.repeatMode]);
+}
+function updatePlayModeUI() {
+  const sb = $('#btn-shuffle');
+  if (sb) { sb.classList.toggle('on', State.shuffleOn); sb.title = State.shuffleOn ? '隨機(開)' : '隨機(關)'; }
+  const rb = $('#btn-repeat');
+  const badge = $('#repeat-badge');
+  if (rb) {
+    rb.classList.toggle('on', State.repeatMode > 0);
+    rb.title = ['重複(關)', '重複本首', '重複整個歌單'][State.repeatMode];
+    if (badge) {
+      if (State.repeatMode === 1) { badge.textContent = '1'; badge.style.display = ''; }
+      else if (State.repeatMode === 2) { badge.textContent = '∞'; badge.style.display = ''; }
+      else { badge.style.display = 'none'; }
+    }
+  }
 }
 function seek(delta) {
   if (!State.player || !State.player.getCurrentTime) return;
@@ -2095,7 +2150,7 @@ async function addSong(s) {
   const local = {
     id: uid(), title: s.title, artist: s.artist || '', videoId: s.videoId,
     thumb: s.thumb || `https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg`,
-    dur:'', addedAt: new Date().toISOString(), tag:'', playCount:0, lastPlay:'',
+    dur:'', addedAt: new Date().toISOString(), tag: (s.artist || '').trim(), playCount:0, lastPlay:'',
     lrc:'', note:'', translations:{}, explanations:{}, sections:[],
     playlistIds: State.currentPlaylistId === 'all' ? [] : [State.currentPlaylistId], bpm: 0
   };
@@ -2321,7 +2376,7 @@ function handleVoice(txt) {
   if (t === '繼續' || t === '播放' || /^play$/.test(t)) { State.player && State.player.playVideo(); toast('繼續'); endVoice(); return; }
   if (/(下一首|next|下一個)/.test(t)) { playNext(); endVoice(); return; }
   if (/(上一首|prev|前一首)/.test(t)) { playPrev(); endVoice(); return; }
-  if (/(隨機|shuffle)/.test(t)) { shuffle(); toast('隨機'); endVoice(); return; }
+  if (/(隨機|shuffle)/.test(t)) { toggleShuffle(); if (State.shuffleOn) { const n = _pickRandom(); if (n) playSong(n.id); } endVoice(); return; }
   if (/(快一點|加速|speedup)/.test(t)) { const i = SPEEDS.indexOf(State.speed); setSpeed(SPEEDS[Math.min(SPEEDS.length-1, i+1)]); toast('速度 ' + State.speed + '×'); endVoice(); return; }
   if (/(慢一點|減速|slowdown)/.test(t)) { const i = SPEEDS.indexOf(State.speed); setSpeed(SPEEDS[Math.max(0, i-1)]); toast('速度 ' + State.speed + '×'); endVoice(); return; }
   if (/(原速|正常速度|normal)/.test(t)) { setSpeed(1); toast('原速'); endVoice(); return; }
@@ -2389,7 +2444,8 @@ function bind() {
   $('#btn-play').addEventListener('click', togglePlay);
   $('#btn-prev').addEventListener('click', playPrev);
   $('#btn-next').addEventListener('click', playNext);
-  $('#btn-shuffle').addEventListener('click', shuffle);
+  $('#btn-shuffle').addEventListener('click', toggleShuffle);
+  $('#btn-repeat').addEventListener('click', cycleRepeat);
   $('#btn-back10').addEventListener('click', ()=>seek(-10));
   $('#btn-fwd10').addEventListener('click', ()=>seek(10));
   $('#btn-voice').addEventListener('click', startVoice);
@@ -2577,7 +2633,19 @@ async function init() {
   loadSettings(); loadSongsLocal(); loadPlaylistsLocal();
   bind(); initVoice(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
   switchMode(localStorage.getItem(LS.viewMode) || 'lyrics');
+  State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
+  State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
+  updatePlayModeUI();
   if (State.settings.gasUrl) await syncFromGAS();
+  // 自動補上歌手標籤(現有歌曲沒設過 tag 的)
+  let tagged = 0;
+  State.songs.forEach(s => {
+    if (!s.tag && s.artist && s.artist.trim()) { s.tag = s.artist.trim(); tagged++; }
+  });
+  if (tagged) {
+    saveSongsLocal();
+    State.songs.forEach(s => { if (s.tag === s.artist) pushSongToCloud(s); });
+  }
   const lastId = localStorage.getItem(LS.current);
   if (lastId && State.songs.some(s => s.id === lastId)) {
     const s = State.songs.find(x => x.id === lastId);
