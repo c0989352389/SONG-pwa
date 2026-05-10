@@ -249,6 +249,15 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .lib-search{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,rgba(10,4,32,.92) 0%,rgba(10,4,32,.7) 80%,transparent 100%);backdrop-filter:blur(12px);margin:-14px -14px 8px;padding:14px 14px 8px}
 .pl-tabs{display:flex;gap:6px;overflow-x:auto;padding:0 0 8px;scrollbar-width:none}
 .pl-tabs::-webkit-scrollbar{display:none}
+.pl-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pl-now{flex:1;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:14px;padding:11px 16px;color:#fff;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 35%,transparent)}
+.pl-now:active{transform:scale(.98)}
+.pl-now-arrow{font-size:11px;opacity:.85;font-weight:400}
+.pl-now.open .pl-now-arrow::before{content:'▲ '}
+.pl-add{width:42px;height:42px;border-radius:14px;background:var(--glass);border:1px dashed var(--accent);color:var(--accent);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit}
+.pl-drawer{background:rgba(0,0,0,.4);border:1px solid var(--glass-br);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px;max-height:50vh;overflow-y:auto}
+.pl-drawer .pl-tab{padding:9px 10px;text-align:center;font-size:12.5px}
+.pl-drawer .pl-tab .ct{font-size:10px;color:var(--text3);margin-left:4px}
 .pl-tab{flex-shrink:0;background:var(--glass);border:1px solid var(--glass-br);border-radius:18px;padding:6px 14px;color:var(--text2);font-family:inherit;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .15s}
 .pl-tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-weight:600}
 .pl-tab.add{color:var(--accent);border-style:dashed}
@@ -503,7 +512,11 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           </button>
         </div>
-        <div class="pl-tabs" id="pl-tabs"></div>
+        <div class="pl-top">
+          <button class="pl-now" id="pl-now"><span id="pl-now-name">📁 全部歌曲</span><span class="pl-now-arrow">▼ 切換</span></button>
+          <button class="pl-add" id="pl-add">＋</button>
+        </div>
+        <div class="pl-drawer" id="pl-drawer" style="display:none"></div>
       </div>
       <div id="lib-list"></div>
     </section>
@@ -2004,15 +2017,22 @@ function renderClassifyTabs() {
   });
 }
 function renderPlaylistTabs() {
-  const tabs = $('#pl-tabs');
-  const pls = [{ id:'all', name:'全部' }, ...State.playlists.sort((a,b)=>a.sortOrder-b.sortOrder)];
-  tabs.innerHTML = `<button class="pl-tab add" id="btn-pl-mgr">＋ 管理</button>` +
-    pls.map(p => `<button class="pl-tab ${p.id===State.currentPlaylistId?'active':''}" data-id="${p.id}">${escapeHtml(p.name)}</button>`).join('');
-  tabs.querySelectorAll('[data-id]').forEach(b => {
+  const drawer = $('#pl-drawer'); const nowBtn = $('#pl-now'); const nowName = $('#pl-now-name');
+  if (!drawer || !nowBtn) return;
+  const pls = [{ id:'all', name:'全部歌曲' }, ...State.playlists.sort((a,b)=>a.sortOrder-b.sortOrder)];
+  const cur = pls.find(p => p.id === State.currentPlaylistId) || pls[0];
+  const curCount = cur.id === 'all' ? State.songs.length : State.songs.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(cur.id)).length;
+  nowName.textContent = `📁 ${cur.name} (${curCount} 首)`;
+  drawer.innerHTML = pls.map(p => {
+    const ct = p.id === 'all' ? State.songs.length : State.songs.filter(s => Array.isArray(s.playlistIds) && s.playlistIds.includes(p.id)).length;
+    return `<button class="pl-tab ${p.id===State.currentPlaylistId?'active':''}" data-id="${p.id}">${escapeHtml(p.name)}<span class="ct">${ct}</span></button>`;
+  }).join('');
+  drawer.querySelectorAll('[data-id]').forEach(b => {
     b.addEventListener('click', () => {
       State.currentPlaylistId = b.dataset.id;
       State.libPage = 0;
       localStorage.setItem(LS.currentPl, b.dataset.id);
+      drawer.style.display = 'none'; nowBtn.classList.remove('open');
       renderPlaylistTabs(); renderLibrary();
     });
     // 拖曳到 tab → 加入該歌單
@@ -2036,8 +2056,6 @@ function renderPlaylistTabs() {
       renderLibrary();
     });
   });
-  $('#btn-pl-mgr').addEventListener('click', openPlMgr);
-  if (tabs._sortable) { try { tabs._sortable.destroy(); } catch(_){} tabs._sortable = null; }
 }
 function renderLibrary(filter='') {
   const list = $('#lib-list');
@@ -2998,6 +3016,14 @@ function bind() {
   const ntw = document.querySelector('.np-title-wrap');
   if (ntw) ntw.addEventListener('click', () => { if (State.currentId) openSongSheet(State.currentId); });
   $('#btn-edit-save').addEventListener('click', saveEditSong);
+  // 歌單下拉抽屜
+  $('#pl-now').addEventListener('click', () => {
+    const d = $('#pl-drawer'); const btn = $('#pl-now');
+    const open = d.style.display !== 'none';
+    d.style.display = open ? 'none' : 'grid';
+    btn.classList.toggle('open', !open);
+  });
+  $('#pl-add').addEventListener('click', openPlMgr);
   // 音量平衡
   $('#btn-volume').addEventListener('click', openVolModal);
   $('#base-vol').addEventListener('input', e => {
