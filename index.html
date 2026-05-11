@@ -379,6 +379,12 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 /* === 簡潔播放面板 === */
 .np-simple{display:flex;flex-direction:column;min-height:100%;height:auto;gap:10px;padding:0;justify-content:flex-start}
 .np-simple #np-vis{display:block!important;width:100%;flex:0 0 auto;height:42vh;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4);position:relative;touch-action:pan-y}
+body.mode-video .np-simple #np-vis{height:68vh!important}
+body.mode-video .np-simple .big-lyrics{display:none!important}
+body.mode-lyrics .np-simple #np-vis{display:none!important}
+body.mode-lyrics .np-simple .big-lyrics{justify-content:center}
+body.mode-lyrics .np-simple .big-lyrics .bl-now{font-size:clamp(34px,8.5vw,52px)}
+body.mode-lyrics .np-simple .big-lyrics .bl-next{font-size:clamp(20px,5vw,30px)}
 .np-simple #np-vis > div{position:absolute;inset:0}
 .np-simple #np-vis iframe{width:100%;height:100%;border:0}
 #vis-overlay{position:absolute;inset:0;z-index:5;background:transparent;cursor:grab}
@@ -434,6 +440,20 @@ body.orient-land header{display:none}
   <main>
     <section class="page active" id="page-player">
       <div class="np-stage np-simple">
+        <div class="mode-switch" role="tablist">
+          <button data-mode="vinyl" class="active" title="唱片模式">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+            唱片
+          </button>
+          <button data-mode="video" title="YouTube 模式">
+            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/></svg>
+            YouTube
+          </button>
+          <button data-mode="lyrics" title="歌詞模式">
+            <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            歌詞
+          </button>
+        </div>
         <div class="np-player-vis" id="np-vis">
           <div id="yt-iframe-mount"></div>
           <div id="yt-iframe-mount-2" style="display:none"></div>
