@@ -377,7 +377,7 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .chip.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-weight:600}
 
 /* === 簡潔播放面板 === */
-.np-simple{display:flex;flex-direction:column;height:calc(100dvh - 70px);gap:10px;padding:0}
+.np-simple{display:flex;flex-direction:column;min-height:100%;height:auto;gap:10px;padding:0;justify-content:flex-start}
 .np-simple #np-vis{display:block!important;width:100%;flex:0 0 auto;height:42vh;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4);position:relative}
 .np-simple #np-vis > div{position:absolute;inset:0}
 .np-simple #np-vis iframe{width:100%;height:100%;border:0}
@@ -444,13 +444,25 @@ body.orient-land header{display:none}
             <button class="btn danger sm" id="btn-lrc-wrong" title="報錯重找">🚫</button>
           </div>
         </div>
-        <!-- 隱藏:保留 DOM 給 JS 使用 -->
-        <div id="np-title" style="display:none"><span class="np-mq"></span></div>
-        <div id="np-artist" style="display:none"></div>
-        <div id="np-art" style="display:none"><div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div></div>
-        <div id="np-bar" style="display:none"><div class="np-fill-wrap"><div class="np-fill" id="np-fill"></div></div><div class="np-knob" id="np-knob"></div></div>
-        <span id="np-cur" style="display:none">0:00</span><span id="np-dur" style="display:none">0:00</span>
-        <div id="lyr-box" style="display:none"></div>
+        <!-- 隱藏:保留 DOM 給 JS 使用,避免 null 拋錯 -->
+        <div style="display:none" aria-hidden="true">
+          <div id="np-title"><span class="np-mq"></span></div>
+          <div id="np-artist"></div>
+          <div id="np-art"><div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div></div>
+          <div id="np-bar"><div class="np-fill-wrap"><div class="np-fill" id="np-fill"></div></div><div class="np-knob" id="np-knob"></div></div>
+          <span id="np-cur">0:00</span><span id="np-dur">0:00</span>
+          <div id="lyr-box"></div>
+          <button id="btn-play">▶</button>
+          <button id="btn-prev"></button><button id="btn-next"></button>
+          <button id="btn-back10"></button><button id="btn-fwd10"></button>
+          <button id="btn-shuffle"></button><button id="btn-repeat"><span id="repeat-badge"></span></button>
+          <button id="btn-speed"><span id="speed-badge">1×</span></button>
+          <button id="btn-fullscreen"></button><button id="btn-volume"></button>
+          <button id="btn-ab-a"></button><button id="btn-ab-b"></button>
+          <button id="btn-ab-loop"></button><button id="btn-ab-clear"></button>
+          <button id="btn-lrc-reset"></button>
+          <button id="btn-refetch-lrc"></button><button id="btn-translate-all"></button>
+        </div>
       </div>
     </section>
 
@@ -1656,11 +1668,10 @@ function showSpeedMenu() {
 
 //============== AB Loop ==============
 function drawAbButtons() {
-  $('#btn-ab-a').textContent = 'A: ' + fmtSec(State.ab.a);
-  $('#btn-ab-a').classList.toggle('set', State.ab.a !== null);
-  $('#btn-ab-b').textContent = 'B: ' + fmtSec(State.ab.b);
-  $('#btn-ab-b').classList.toggle('set', State.ab.b !== null);
-  $('#btn-ab-loop').classList.toggle('on', State.ab.on);
+  const a = $('#btn-ab-a'), b = $('#btn-ab-b'), l = $('#btn-ab-loop');
+  if (a) { a.textContent = 'A: ' + fmtSec(State.ab.a); a.classList.toggle('set', State.ab.a !== null); }
+  if (b) { b.textContent = 'B: ' + fmtSec(State.ab.b); b.classList.toggle('set', State.ab.b !== null); }
+  if (l) l.classList.toggle('on', State.ab.on);
 }
 function drawAbMarkers() {
   const bar = $('#np-bar');
