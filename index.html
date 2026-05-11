@@ -522,6 +522,7 @@ body.orient-land header{display:none}
             <button class="btn dim sm" id="btn-lrc-back" title="歌詞早 0.5 秒">⏪</button>
             <span class="offset-lbl sm" id="lrc-offset">0.0s</span>
             <button class="btn dim sm" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">⏩</button>
+            <button class="btn sm" id="btn-lrc-anchor" title="以當前時間定位第一句歌詞">📍</button>
             <button class="btn sm" id="btn-lrc-calib" title="點句校正">🎯</button>
             <button class="btn sm" id="btn-lrc-tap" title="逐句打點">🎵</button>
             <button class="btn sm" id="btn-edit-lrc" title="編輯歌詞">📝</button>
@@ -1992,6 +1993,22 @@ function shiftLrc(delta) {
   if (State.player && State.player.getCurrentTime) syncLyric(State.player.getCurrentTime() || 0);
   _flashOffset(s.lrcOffset, delta);
 }
+function anchorFirstLyric() {
+  const s = getCur(); if (!s) { toast('先選一首歌'); return; }
+  if (!State.lyrics.length) { toast('沒有歌詞,請先載入'); return; }
+  const first = State.lyrics.find(l => l.t >= 0);
+  if (!first) { toast('歌詞還沒有時間軸,先用「🎵 逐句打點」'); return; }
+  if (!State.player || !State.player.getCurrentTime) { toast('播放器尚未就緒'); return; }
+  const now = State.player.getCurrentTime() || 0;
+  const oldOff = s.lrcOffset || 0;
+  s.lrcOffset = Math.round((now - first.t) * 10) / 10;
+  saveSongsLocal(); pushSongToCloud(s);
+  updateLrcOffsetLabel();
+  State.activeLyricIdx = -2;
+  syncLyric(now);
+  _flashOffset(s.lrcOffset, s.lrcOffset - oldOff);
+  toast('📍 已將第一句定位在 ' + fmt(now));
+}
 function _flashOffset(total, delta) {
   let el = document.getElementById('offset-flash');
   if (!el) {
@@ -3294,6 +3311,7 @@ function bind() {
   $('#btn-translate-all')?.addEventListener('click', translateAll);
   $('#btn-lrc-back')?.addEventListener('click', () => shiftLrc(-0.5));
   $('#btn-lrc-fwd')?.addEventListener('click', () => shiftLrc(0.5));
+  $('#btn-lrc-anchor')?.addEventListener('click', anchorFirstLyric);
   $('#btn-lrc-reset')?.addEventListener('click', resetLrcOffset);
   $('#btn-lrc-calib').addEventListener('click', toggleCalib);
   $('#btn-lrc-wrong').addEventListener('click', reportLyricsWrong);
