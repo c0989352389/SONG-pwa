@@ -19,7 +19,7 @@
   --accent:#a96bff; --accent2:#00f0ff; --hot:#ff4fb0;
   --text:#f0e8ff; --text2:#a89dc8; --text3:rgba(168,157,200,.4);
   --glass:rgba(255,255,255,.06); --glass-br:rgba(255,255,255,.14); --glass-st:rgba(255,255,255,.18);
-  --r:18px; --nav-h:0px;
+  --r:18px; --nav-h:68px;
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
 }
 .theme-fire{--accent:#ff6b3d;--accent2:#ffd03d;--hot:#ff3d6b}
@@ -550,11 +550,10 @@ body.orient-land header{display:none}
     </section>
   </main>
 
-  <!-- 底部 nav 已移除,改用滑動切換頁面 -->
-  <nav style="display:none">
-    <button class="nb active" data-page="player"></button>
-    <button class="nb" data-page="library"></button>
-    <button class="nb" data-page="add"></button>
+  <nav>
+    <button class="nb active" data-page="player"><span class="ni">♪</span><span>播放</span></button>
+    <button class="nb" data-page="library"><span class="ni">♫</span><span>歌單</span></button>
+    <button class="nb" data-page="add"><span class="ni">＋</span><span>加歌</span></button>
   </nav>
 
   <div class="toast" id="toast"></div>
@@ -3446,10 +3445,7 @@ async function init() {
   State.langFilter = localStorage.getItem(LS.langF) || 'all';
   State.genderFilter = localStorage.getItem(LS.genderF) || 'all';
   bind(); initVoice(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
-  initGestures();
-  applyOrientation();
-  window.matchMedia('(orientation: landscape)').addEventListener('change', applyOrientation);
-  window.addEventListener('resize', applyOrientation);
+  // 手勢已取消
   switchMode(localStorage.getItem(LS.viewMode) || 'vinyl');
   State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
   State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
