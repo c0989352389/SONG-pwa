@@ -391,6 +391,14 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .lrc-mini .offset-lbl.sm{font-family:ui-monospace,monospace;font-size:11px;color:var(--text2);padding:4px 8px;background:var(--glass);border-radius:10px;min-width:50px;text-align:center}
 /* 移除舊面板的 padding-bottom 對齊(因為 nav 拿掉了) */
 .page{padding-bottom:14px!important}
+/* 橫向佈局:歌詞置中變大,影片縮邊 */
+body.orient-land .np-simple{flex-direction:row;height:calc(100dvh - 60px);gap:14px}
+body.orient-land .np-simple #np-vis{flex:0 0 56vw;height:auto;align-self:center;aspect-ratio:16/9}
+body.orient-land .big-lyrics{flex:1 1 auto;justify-content:center}
+body.orient-land .big-lyrics .bl-now{font-size:clamp(24px,3.4vw,42px)}
+body.orient-land .big-lyrics .bl-next{font-size:clamp(16px,2.4vw,26px)}
+body.orient-land .np-bottom-row{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(15,15,22,.85);backdrop-filter:blur(14px);border-radius:30px;padding:6px 12px;z-index:50}
+body.orient-land header{display:none}
 </style>
 </head>
 <body>
@@ -2894,6 +2902,75 @@ function switchPage(name) {
   }
 }
 
+//============== Gestures ==============
+const PAGE_ORDER = ['player', 'library', 'add'];
+function _currentPageName() {
+  const active = document.querySelector('.page.active');
+  return active ? active.id.replace('page-','') : 'player';
+}
+function pageRight() {
+  const cur = _currentPageName();
+  const i = PAGE_ORDER.indexOf(cur);
+  if (i < PAGE_ORDER.length - 1) switchPage(PAGE_ORDER[i + 1]);
+}
+function pageLeft() {
+  const cur = _currentPageName();
+  const i = PAGE_ORDER.indexOf(cur);
+  if (i > 0) switchPage(PAGE_ORDER[i - 1]);
+}
+function initGestures() {
+  let sx = 0, sy = 0, st = 0, tracking = false;
+  const TH = 60; // 觸發距離
+  const MAX_TIME = 800; // 800ms
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    // 排除互動元素
+    const t = e.target;
+    if (t.closest('input, textarea, select, button, .lyr-line, .pl-tab, .chip, .song-row, [data-act], .preview-overlay, .modal, .sheet, iframe, #yt-iframe-mount, .np-bar')) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); tracking = true;
+  }, { passive:true });
+  document.addEventListener('touchend', e => {
+    if (!tracking) return; tracking = false;
+    const t = e.changedTouches[0]; if (!t) return;
+    const dx = t.clientX - sx, dy = t.clientY - sy, dt = Date.now() - st;
+    if (dt > MAX_TIME) return;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    // 水平
+    if (ax > TH && ax > ay * 1.4) {
+      if (dx < 0) { // 左滑 → 設定
+        if (!document.querySelector('.modal.show')) $('#modal-settings').classList.add('show');
+      } else { // 右滑 → 下個頁面
+        pageRight();
+      }
+      return;
+    }
+    // 垂直
+    if (ay > TH && ay > ax * 1.4) {
+      if (dy < 0) { // 上滑 → YouTube 全螢幕
+        if (_currentPageName() === 'player' && State.viewMode !== 'video') {
+          switchMode && switchMode('video');
+          toast('YouTube 全螢幕模式',1500);
+        }
+      } else {
+        // 下滑 → 從 video 回 vinyl
+        if (_currentPageName() === 'player' && State.viewMode === 'video') {
+          switchMode && switchMode('vinyl');
+        }
+      }
+    }
+  }, { passive:true });
+}
+
+//============== Orientation ==============
+function applyOrientation() {
+  const land = window.matchMedia('(orientation: landscape)').matches;
+  document.body.classList.toggle('orient-land', land);
+  if (land && _currentPageName() === 'player') {
+    // 橫向 → 自動切到影片模式並嘗試 fullscreen
+    if (State.viewMode !== 'video') switchMode && switchMode('video');
+  }
+}
+
 //============== Bind ==============
 function bind() {
   $$('.nb').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
@@ -3192,6 +3269,9 @@ async function init() {
   State.langFilter = localStorage.getItem(LS.langF) || 'all';
   State.genderFilter = localStorage.getItem(LS.genderF) || 'all';
   bind(); initVoice(); renderPlaylistTabs(); renderLibrary(); updateSpeedLabel(); drawAbButtons();
+  initGestures();
+  applyOrientation();
+  window.matchMedia('(orientation: landscape)').addEventListener('change', applyOrientation);
   switchMode(localStorage.getItem(LS.viewMode) || 'vinyl');
   State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
   State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
