@@ -428,6 +428,12 @@ body.orient-land header{display:none}
 #float-ctrl .fc-btns{display:flex;justify-content:space-between;align-items:center;gap:8px}
 #float-ctrl .fc-btn{background:var(--glass);border:1px solid var(--glass-br);color:var(--text);width:44px;height:44px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit}
 #float-ctrl .fc-btn.fc-play{width:54px;height:54px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;font-size:20px;color:#fff;box-shadow:0 6px 20px color-mix(in srgb,var(--accent) 50%,transparent)}
+
+/* 歌詞偏移即時提示(大字飛出) */
+#offset-flash{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.8);z-index:9500;background:rgba(15,15,22,.92);backdrop-filter:blur(18px);border:1px solid var(--glass-st);border-radius:18px;padding:18px 28px;text-align:center;box-shadow:0 16px 50px rgba(0,0,0,.7),0 0 40px color-mix(in srgb,var(--accent) 40%,transparent);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+#offset-flash.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#offset-flash .of-delta{font-size:42px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:1px;line-height:1}
+#offset-flash .of-total{font-size:13px;color:var(--text2);margin-top:6px;letter-spacing:1px;font-family:ui-monospace,monospace}
 </style>
 </head>
 <body>
@@ -1982,9 +1988,23 @@ function shiftLrc(delta) {
   s.lrcOffset = Math.round(((s.lrcOffset || 0) + delta) * 10) / 10;
   saveSongsLocal(); pushSongToCloud(s);
   updateLrcOffsetLabel();
-  State.activeLyricIdx = -2; // 強制重新套用
+  State.activeLyricIdx = -2;
   if (State.player && State.player.getCurrentTime) syncLyric(State.player.getCurrentTime() || 0);
-  toast('偏移 ' + (s.lrcOffset>=0?'+':'') + s.lrcOffset.toFixed(1) + 's');
+  _flashOffset(s.lrcOffset, delta);
+}
+function _flashOffset(total, delta) {
+  let el = document.getElementById('offset-flash');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'offset-flash';
+    document.body.appendChild(el);
+  }
+  const sign = total >= 0 ? '+' : '';
+  const dSign = delta > 0 ? '+' : '';
+  el.innerHTML = `<div class="of-delta">${dSign}${delta.toFixed(1)}s</div><div class="of-total">目前偏移 ${sign}${total.toFixed(1)}s</div>`;
+  el.classList.add('show');
+  clearTimeout(_flashOffset._t);
+  _flashOffset._t = setTimeout(() => el.classList.remove('show'), 1500);
 }
 function resetLrcOffset() {
   const s = getCur(); if (!s) return;
