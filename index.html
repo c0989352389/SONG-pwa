@@ -378,10 +378,19 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 
 /* === 簡潔播放面板 === */
 .np-simple{display:flex;flex-direction:column;min-height:100%;height:auto;gap:10px;padding:0;justify-content:flex-start}
-.np-simple #np-vis{display:block!important;width:100%;flex:0 0 auto;height:42vh;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4);position:relative;touch-action:pan-y}
-body.mode-video .np-simple #np-vis{height:68vh!important}
+.np-simple #np-vis{width:100%;flex:0 0 auto;height:36vh;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4);position:relative;touch-action:pan-y}
+.np-simple #np-art{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:100%;height:36vh}
+/* 預設(唱片模式) */
+.np-simple #np-vis{display:none}
+body.mode-vinyl .np-simple #np-art{display:flex}
+body.mode-vinyl .np-simple #np-vis{display:none}
+/* YouTube 模式 */
+body.mode-video .np-simple #np-vis{display:block;height:68vh}
+body.mode-video .np-simple #np-art{display:none}
 body.mode-video .np-simple .big-lyrics{display:none!important}
-body.mode-lyrics .np-simple #np-vis{display:none!important}
+/* 歌詞模式 */
+body.mode-lyrics .np-simple #np-vis{display:none}
+body.mode-lyrics .np-simple #np-art{display:none}
 body.mode-lyrics .np-simple .big-lyrics{justify-content:center}
 body.mode-lyrics .np-simple .big-lyrics .bl-now{font-size:clamp(34px,8.5vw,52px)}
 body.mode-lyrics .np-simple .big-lyrics .bl-next{font-size:clamp(20px,5vw,30px)}
@@ -457,12 +466,31 @@ body.orient-land header{display:none}
         <div class="np-player-vis" id="np-vis">
           <div id="yt-iframe-mount"></div>
           <div id="yt-iframe-mount-2" style="display:none"></div>
-          <div id="vis-overlay" aria-hidden="true"></div>
+        </div>
+        <div class="np-art empty" id="np-art">
+          <div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div>
+          <span class="empty-label">♪</span>
         </div>
         <div class="big-lyrics" id="big-lyrics">
           <div class="bl-now">　</div>
           <div class="bl-next">　</div>
         </div>
+
+        <div class="np-prog">
+          <div class="np-bar" id="np-bar">
+            <div class="np-fill-wrap"><div class="np-fill" id="np-fill"></div></div>
+            <div class="np-knob" id="np-knob" style="left:0%"></div>
+          </div>
+          <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
+        </div>
+        <div class="np-ctrl">
+          <button class="small" id="btn-prev" title="上一首">⏮</button>
+          <button class="small" id="btn-back10" title="後退10秒">«10</button>
+          <button class="play" id="btn-play" title="播放/暫停">▶</button>
+          <button class="small" id="btn-fwd10" title="前進10秒">10»</button>
+          <button class="small" id="btn-next" title="下一首">⏭</button>
+        </div>
+
         <div class="np-bottom-row">
           <button class="voice-fab" id="btn-voice" title="語音控制" aria-label="語音控制">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
@@ -475,20 +503,15 @@ body.orient-land header{display:none}
             <button class="btn sm" id="btn-lrc-tap" title="逐句打點">🎵</button>
             <button class="btn sm" id="btn-edit-lrc" title="編輯歌詞">📝</button>
             <button class="btn danger sm" id="btn-lrc-wrong" title="報錯重找">🚫</button>
+            <button class="btn sm" id="btn-shuffle" title="隨機">🔀</button>
+            <button class="btn sm" id="btn-repeat" title="重複">🔁<span class="badge" id="repeat-badge" style="display:none">1</span></button>
           </div>
         </div>
         <!-- 隱藏:保留 DOM 給 JS 使用,避免 null 拋錯 -->
         <div style="display:none" aria-hidden="true">
           <div id="np-title"><span class="np-mq"></span></div>
           <div id="np-artist"></div>
-          <div id="np-art"><div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div></div>
-          <div id="np-bar"><div class="np-fill-wrap"><div class="np-fill" id="np-fill"></div></div><div class="np-knob" id="np-knob"></div></div>
-          <span id="np-cur">0:00</span><span id="np-dur">0:00</span>
           <div id="lyr-box"></div>
-          <button id="btn-play">▶</button>
-          <button id="btn-prev"></button><button id="btn-next"></button>
-          <button id="btn-back10"></button><button id="btn-fwd10"></button>
-          <button id="btn-shuffle"></button><button id="btn-repeat"><span id="repeat-badge"></span></button>
           <button id="btn-speed"><span id="speed-badge">1×</span></button>
           <button id="btn-fullscreen"></button><button id="btn-volume"></button>
           <button id="btn-ab-a"></button><button id="btn-ab-b"></button>
