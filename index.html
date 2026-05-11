@@ -378,9 +378,10 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 
 /* === 簡潔播放面板 === */
 .np-simple{display:flex;flex-direction:column;min-height:100%;height:auto;gap:10px;padding:0;justify-content:flex-start}
-.np-simple #np-vis{display:block!important;width:100%;flex:0 0 auto;height:42vh;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4);position:relative}
+.np-simple #np-vis{display:block!important;width:100%;flex:0 0 auto;height:42vh;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4);position:relative;touch-action:pan-y}
 .np-simple #np-vis > div{position:absolute;inset:0}
 .np-simple #np-vis iframe{width:100%;height:100%;border:0}
+#vis-overlay{position:absolute;inset:0;z-index:5;background:transparent;cursor:grab}
 .big-lyrics{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:14px 18px;overflow:hidden;min-height:0}
 .big-lyrics .bl-now{font-size:clamp(28px,7.5vw,44px);font-weight:700;color:#fff;text-shadow:0 0 24px color-mix(in srgb,var(--accent) 80%,transparent),0 2px 6px rgba(0,0,0,.6);line-height:1.35;letter-spacing:1px;margin-bottom:12px;transition:all .3s}
 .big-lyrics .bl-next{font-size:clamp(18px,4.6vw,26px);color:rgba(255,255,255,.45);line-height:1.35;transition:all .3s;letter-spacing:.5px}
@@ -425,6 +426,7 @@ body.orient-land header{display:none}
         <div class="np-player-vis" id="np-vis">
           <div id="yt-iframe-mount"></div>
           <div id="yt-iframe-mount-2" style="display:none"></div>
+          <div id="vis-overlay" aria-hidden="true"></div>
         </div>
         <div class="big-lyrics" id="big-lyrics">
           <div class="bl-now">　</div>
