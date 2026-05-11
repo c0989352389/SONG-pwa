@@ -19,7 +19,7 @@
   --accent:#a96bff; --accent2:#00f0ff; --hot:#ff4fb0;
   --text:#f0e8ff; --text2:#a89dc8; --text3:rgba(168,157,200,.4);
   --glass:rgba(255,255,255,.06); --glass-br:rgba(255,255,255,.14); --glass-st:rgba(255,255,255,.18);
-  --r:18px; --nav-h:68px;
+  --r:18px; --nav-h:0px;
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
 }
 .theme-fire{--accent:#ff6b3d;--accent2:#ffd03d;--hot:#ff3d6b}
@@ -375,6 +375,22 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .chip{display:inline-flex;align-items:center;gap:4px;background:var(--glass);border:1px solid var(--glass-br);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--text2);margin:3px;cursor:pointer;transition:all .15s}
 .chip:hover{background:rgba(255,255,255,.1)}
 .chip.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-weight:600}
+
+/* === 簡潔播放面板 === */
+.np-simple{display:flex;flex-direction:column;height:calc(100dvh - 70px);gap:10px;padding:0}
+.np-simple #np-vis{display:block!important;width:100%;flex:0 0 auto;height:42vh;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.np-simple #np-vis iframe{width:100%;height:100%;border:0}
+.big-lyrics{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:14px 18px;overflow:hidden;min-height:0}
+.big-lyrics .bl-now{font-size:clamp(22px,5.5vw,32px);font-weight:700;color:#fff;text-shadow:0 0 24px color-mix(in srgb,var(--accent) 80%,transparent),0 2px 6px rgba(0,0,0,.6);line-height:1.4;letter-spacing:1px;margin-bottom:10px;transition:all .3s}
+.big-lyrics .bl-next{font-size:clamp(15px,3.6vw,20px);color:rgba(255,255,255,.42);line-height:1.4;transition:all .3s;letter-spacing:.5px}
+.np-bottom-row{display:flex;align-items:center;gap:10px;padding:0 6px 6px;flex-shrink:0}
+.voice-fab{width:44px;height:44px;border-radius:50%;background:var(--glass);border:1px solid var(--glass-br);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit}
+.voice-fab.rec{background:var(--hot);border-color:var(--hot);color:#fff;animation:pulse 1.4s infinite}
+.lrc-mini{flex:1;display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.lrc-mini .btn{padding:6px 9px;font-size:13px;min-height:auto;border-radius:10px}
+.lrc-mini .offset-lbl.sm{font-family:ui-monospace,monospace;font-size:11px;color:var(--text2);padding:4px 8px;background:var(--glass);border-radius:10px;min-width:50px;text-align:center}
+/* 移除舊面板的 padding-bottom 對齊(因為 nav 拿掉了) */
+.page{padding-bottom:14px!important}
 </style>
 </head>
 <body>
@@ -395,112 +411,33 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 
   <main>
     <section class="page active" id="page-player">
-      <div class="np-stage">
-        <div class="mode-switch" role="tablist">
-          <button data-mode="vinyl" class="active" title="唱片模式">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
-            唱片
-          </button>
-          <button data-mode="video" title="YouTube 模式">
-            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/></svg>
-            YouTube
-          </button>
-          <button data-mode="lyrics" title="歌詞模式">
-            <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            歌詞
-          </button>
-        </div>
+      <div class="np-stage np-simple">
         <div class="np-player-vis" id="np-vis"><div id="yt-iframe-mount"></div></div>
-        <div class="np-art empty" id="np-art">
-          <div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div>
-          <svg class="vinyl-arm" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-              <linearGradient id="armG" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#e8e8ea"/>
-                <stop offset="50%" stop-color="#9a9a9e"/>
-                <stop offset="100%" stop-color="#5a5a5e"/>
-              </linearGradient>
-              <radialGradient id="pivotG" cx="50%" cy="40%">
-                <stop offset="0%" stop-color="#cfcfd2"/>
-                <stop offset="60%" stop-color="#5a5a5e"/>
-                <stop offset="100%" stop-color="#1a1a1c"/>
-              </radialGradient>
-            </defs>
-            <circle cx="86" cy="14" r="13" fill="url(#pivotG)" stroke="#000" stroke-width="1"/>
-            <circle cx="86" cy="14" r="5" fill="#1a1a1c"/>
-            <line x1="86" y1="14" x2="32" y2="108" stroke="url(#armG)" stroke-width="7" stroke-linecap="round"/>
-            <line x1="86" y1="14" x2="32" y2="108" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/>
-            <rect x="20" y="100" width="22" height="18" rx="3" fill="#2a2a2e" stroke="#000" stroke-width="1" transform="rotate(-30 31 109)"/>
-            <rect x="22" y="116" width="18" height="4" fill="#000" transform="rotate(-30 31 118)"/>
-          </svg>
-          <span class="empty-label">♪</span>
+        <div class="big-lyrics" id="big-lyrics">
+          <div class="bl-now">　</div>
+          <div class="bl-next">　</div>
         </div>
-        <div class="np-title-wrap"><div class="np-title" id="np-title"><span class="np-mq">尚未選曲</span></div></div>
-        <div class="np-artist" id="np-artist">點下方收藏選一首，或到「加歌」搜尋</div>
-
-        <div class="np-prog">
-          <div class="np-bar" id="np-bar">
-            <div class="np-fill-wrap"><div class="np-fill" id="np-fill"></div></div>
-            <div class="np-knob" id="np-knob" style="left:0%"></div>
-          </div>
-          <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
-        </div>
-
-        <div class="np-ctrl">
-          <button class="small" id="btn-prev" title="上一首"><svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><defs><linearGradient id="bcFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5a5a66"/><stop offset="50%" stop-color="#1a1a22"/><stop offset="100%" stop-color="#3a3a44"/></linearGradient><linearGradient id="bcEdge" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#aaaab2"/><stop offset="100%" stop-color="#4a4a52"/></linearGradient></defs><polygon points="22,8 12,16 22,24" fill="url(#bcFill)" stroke="url(#bcEdge)" stroke-width="1.2"/><polygon points="14,8 4,16 14,24" fill="url(#bcFill)" stroke="url(#bcEdge)" stroke-width="1.2"/></svg></button>
-          <button class="small" id="btn-back10" title="後退10秒">«10</button>
-          <button class="play" id="btn-play" title="播放/暫停">▶</button>
-          <button class="small" id="btn-fwd10" title="前進10秒">10»</button>
-          <button class="small" id="btn-next" title="下一首"><svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><polygon points="10,8 20,16 10,24" fill="url(#bcFill)" stroke="url(#bcEdge)" stroke-width="1.2"/><polygon points="18,8 28,16 18,24" fill="url(#bcFill)" stroke="url(#bcEdge)" stroke-width="1.2"/></svg></button>
-        </div>
-
-        <div class="tool-bar">
-          <button class="tool-btn" id="btn-volume" title="音量平衡" aria-label="音量平衡">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        <div class="np-bottom-row">
+          <button class="voice-fab" id="btn-voice" title="語音控制" aria-label="語音控制">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
           </button>
-          <button class="tool-btn" id="btn-voice" title="語音控制" aria-label="語音控制">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-          </button>
-          <button class="tool-btn" id="btn-fullscreen" title="全螢幕" aria-label="全螢幕">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,9 4,4 9,4"/><polyline points="20,9 20,4 15,4"/><polyline points="4,15 4,20 9,20"/><polyline points="20,15 20,20 15,20"/></svg>
-          </button>
-          <button class="tool-btn" id="btn-edit-lrc" title="編輯歌詞" aria-label="編輯歌詞">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
-          </button>
-          <button class="tool-btn" id="btn-shuffle" title="隨機播放(關)" aria-label="隨機播放">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="16,3 21,3 21,8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21,16 21,21 16,21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-          </button>
-          <button class="tool-btn" id="btn-repeat" title="重複播放(關)" aria-label="重複播放">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-            <span class="badge" id="repeat-badge" style="display:none">1</span>
-          </button>
-          <button class="tool-btn" id="btn-speed" title="倍速" aria-label="倍速">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="12,7 12,12 16,14"/><path d="M21 3l-3 3 3 3" opacity=".5"/></svg>
-            <span class="badge" id="speed-badge">1×</span>
-          </button>
-        </div>
-
-        <div class="ab-row">
-          <button class="ab-pill" id="btn-ab-a">A: --:--</button>
-          <button class="ab-pill" id="btn-ab-b">B: --:--</button>
-          <button class="ab-pill" id="btn-ab-loop">🔁 循環</button>
-          <button class="ab-pill danger" id="btn-ab-clear">清除</button>
-        </div>
-
-        <div class="gc">
-          <div class="lyr-box" id="lyr-box">
-            <div class="lyr-empty">尚無歌詞，點 📝 貼 LRC、🌐 自動抓、或 ✨ AI 生成</div>
-          </div>
-          <div class="lrc-tune">
-            <button class="btn dim" id="btn-lrc-back" title="歌詞早 0.5 秒">⏪ 早0.5s</button>
-            <span class="offset-lbl" id="lrc-offset">0.0s</span>
-            <button class="btn dim" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">⏩ 晚0.5s</button>
-            <button class="btn dim" id="btn-lrc-reset" title="重設偏移">重設</button>
-            <button class="btn" id="btn-lrc-calib" title="點當下歌詞自動校正">🎯 點句校正</button>
-            <button class="btn" id="btn-lrc-tap" title="逐句打點:邊聽邊點每行設時間">🎵 逐句打點</button>
-            <button class="btn danger" id="btn-lrc-wrong" title="標記歌詞錯誤,用修正後的歌名重找">🚫 報錯</button>
+          <div class="lrc-mini">
+            <button class="btn dim sm" id="btn-lrc-back" title="歌詞早 0.5 秒">⏪</button>
+            <span class="offset-lbl sm" id="lrc-offset">0.0s</span>
+            <button class="btn dim sm" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">⏩</button>
+            <button class="btn sm" id="btn-lrc-calib" title="點句校正">🎯</button>
+            <button class="btn sm" id="btn-lrc-tap" title="逐句打點">🎵</button>
+            <button class="btn sm" id="btn-edit-lrc" title="編輯歌詞">📝</button>
+            <button class="btn danger sm" id="btn-lrc-wrong" title="報錯重找">🚫</button>
           </div>
         </div>
+        <!-- 隱藏:保留 DOM 給 JS 使用 -->
+        <div id="np-title" style="display:none"><span class="np-mq"></span></div>
+        <div id="np-artist" style="display:none"></div>
+        <div id="np-art" style="display:none"><div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div></div>
+        <div id="np-bar" style="display:none"><div class="np-fill-wrap"><div class="np-fill" id="np-fill"></div></div><div class="np-knob" id="np-knob"></div></div>
+        <span id="np-cur" style="display:none">0:00</span><span id="np-dur" style="display:none">0:00</span>
+        <div id="lyr-box" style="display:none"></div>
       </div>
     </section>
 
@@ -555,10 +492,11 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
     </section>
   </main>
 
-  <nav>
-    <button class="nb active" data-page="player"><span class="ni">♪</span><span>播放</span></button>
-    <button class="nb" data-page="library"><span class="ni">♫</span><span>歌單</span></button>
-    <button class="nb" data-page="add"><span class="ni">＋</span><span>加歌</span></button>
+  <!-- 底部 nav 已移除,改用滑動切換頁面 -->
+  <nav style="display:none">
+    <button class="nb active" data-page="player"></button>
+    <button class="nb" data-page="library"></button>
+    <button class="nb" data-page="add"></button>
   </nav>
 
   <div class="toast" id="toast"></div>
@@ -1448,13 +1386,7 @@ function playSong(id) {
 }
 // ===== 音量平衡 =====
 const DEFAULT_BASE_VOL = 70;
-function applySongVolume(s) {
-  if (!State.player || !State.player.setVolume) return;
-  const base = (typeof State.baseVolume === 'number') ? State.baseVolume : DEFAULT_BASE_VOL;
-  const offset = (s && typeof s.volOffset === 'number') ? s.volOffset : 0;
-  const v = Math.max(0, Math.min(100, base + offset));
-  try { State.player.setVolume(v); } catch(_){}
-}
+function applySongVolume(s) { /* 音量平衡已取消,沿用 YT 預設 */ }
 function enterFakeFs() {
   document.body.classList.add('fake-fs');
 }
@@ -1694,8 +1626,11 @@ function parseLyrics(lrc) {
   renderLyrics();
 }
 function renderLyrics() {
+  State.activeLyricIdx = -2;
+  _updateBigLyrics(-1);
   const box = $('#lyr-box');
-  if (!State.lyrics.length) { box.innerHTML = '<div class="lyr-empty">尚無歌詞，點 📝 貼 LRC、🌐 自動抓、或 ✨ AI 生成</div>'; return; }
+  if (!box) return;
+  if (!State.lyrics.length) { box.innerHTML = '<div class="lyr-empty">尚無歌詞,點 📝 貼上</div>'; return; }
   const cur = getCur();
   const trs = (cur && cur.translations) || {};
   const exs = (cur && cur.explanations) || {};
@@ -1820,7 +1755,7 @@ function _fmtLrcStamp(t) {
   return String(m).padStart(2, '0') + ':' + String(s).padStart(5, '0');
 }
 function syncLyric(t) {
-  if (!State.lyrics.length) return;
+  if (!State.lyrics.length) { _updateBigLyrics(-1); return; }
   const offset = (getCur()?.lrcOffset) || 0;
   const adjT = t - offset;
   let idx = -1;
@@ -1830,12 +1765,25 @@ function syncLyric(t) {
   }
   if (idx === State.activeLyricIdx) return;
   State.activeLyricIdx = idx;
+  _updateBigLyrics(idx);
+  // 隱藏舊歌詞模式相容(如有)
   const box = $('#lyr-box');
-  box.querySelectorAll('.lyr-line').forEach(el => el.classList.remove('active'));
-  if (idx >= 0) {
-    const el = box.querySelector(`.lyr-line[data-i="${idx}"]`);
-    if (el) { el.classList.add('active'); el.scrollIntoView({ behavior:'smooth', block:'center' }); }
+  if (box) {
+    box.querySelectorAll('.lyr-line').forEach(el => el.classList.remove('active'));
+    if (idx >= 0) {
+      const el = box.querySelector(`.lyr-line[data-i="${idx}"]`);
+      if (el) el.classList.add('active');
+    }
   }
+}
+function _updateBigLyrics(idx) {
+  const now = document.querySelector('.big-lyrics .bl-now');
+  const next = document.querySelector('.big-lyrics .bl-next');
+  if (!now || !next) return;
+  const cur = idx >= 0 ? State.lyrics[idx] : null;
+  const nxt = idx + 1 < State.lyrics.length ? State.lyrics[idx + 1] : null;
+  now.textContent = cur ? cur.text : (State.lyrics.length ? '　' : '');
+  next.textContent = nxt ? nxt.text : '　';
 }
 
 function updateLrcOffsetLabel() {
@@ -2949,17 +2897,17 @@ function switchPage(name) {
 //============== Bind ==============
 function bind() {
   $$('.nb').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
-  $('#btn-play').addEventListener('click', togglePlay);
-  $('#btn-prev').addEventListener('click', playPrev);
-  $('#btn-next').addEventListener('click', playNext);
-  $('#btn-shuffle').addEventListener('click', toggleShuffle);
-  $('#btn-repeat').addEventListener('click', cycleRepeat);
-  $('#btn-back10').addEventListener('click', ()=>seek(-10));
-  $('#btn-fwd10').addEventListener('click', ()=>seek(10));
-  $('#btn-voice').addEventListener('click', startVoice);
-  $('#btn-voice-cancel').addEventListener('click', () => { try{State.recognition && State.recognition.stop()}catch(_){} endVoice(); });
+  $('#btn-play')?.addEventListener('click', togglePlay);
+  $('#btn-prev')?.addEventListener('click', playPrev);
+  $('#btn-next')?.addEventListener('click', playNext);
+  $('#btn-shuffle')?.addEventListener('click', toggleShuffle);
+  $('#btn-repeat')?.addEventListener('click', cycleRepeat);
+  $('#btn-back10')?.addEventListener('click', ()=>seek(-10));
+  $('#btn-fwd10')?.addEventListener('click', ()=>seek(10));
+  $('#btn-voice')?.addEventListener('click', startVoice);
+  $('#btn-voice-cancel')?.addEventListener('click', () => { try{State.recognition && State.recognition.stop()}catch(_){} endVoice(); });
   $$('.mode-switch button').forEach(b => b.addEventListener('click', () => switchMode(b.dataset.mode)));
-  $('#btn-fullscreen').addEventListener('click', async () => {
+  $('#btn-fullscreen')?.addEventListener('click', async () => {
     if (State.viewMode !== 'video') switchMode('video');
     if (document.body.classList.contains('fake-fs')) { exitFakeFs(); return; }
     // 先試原生 Fullscreen API(iframe → np-vis 容器)
@@ -2990,21 +2938,21 @@ function bind() {
     if (Math.abs(cx - w/2) < 130 && cy > h - 90 && cy < h - 10) exitFakeFs();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('fake-fs')) exitFakeFs(); });
-  $('#btn-speed').addEventListener('click', showSpeedMenu);
+  $('#btn-speed')?.addEventListener('click', showSpeedMenu);
   document.addEventListener('click', e => {
-    if (!e.target.closest('#speed-menu') && !e.target.closest('#btn-speed')) $('#speed-menu').style.display='none';
+    if (!e.target.closest('#speed-menu') && !e.target.closest('#btn-speed')) { const sm = $('#speed-menu'); if (sm) sm.style.display='none'; }
   });
 
-  $('#btn-ab-a').addEventListener('click', setA);
-  $('#btn-ab-b').addEventListener('click', setB);
-  $('#btn-ab-loop').addEventListener('click', toggleAbLoop);
-  $('#btn-ab-clear').addEventListener('click', clearAb);
+  $('#btn-ab-a')?.addEventListener('click', setA);
+  $('#btn-ab-b')?.addEventListener('click', setB);
+  $('#btn-ab-loop')?.addEventListener('click', toggleAbLoop);
+  $('#btn-ab-clear')?.addEventListener('click', clearAb);
 
   $('#btn-refetch-lrc')?.addEventListener('click', refetchLyrics);
   $('#btn-translate-all')?.addEventListener('click', translateAll);
-  $('#btn-lrc-back').addEventListener('click', () => shiftLrc(-0.5));
-  $('#btn-lrc-fwd').addEventListener('click', () => shiftLrc(0.5));
-  $('#btn-lrc-reset').addEventListener('click', resetLrcOffset);
+  $('#btn-lrc-back')?.addEventListener('click', () => shiftLrc(-0.5));
+  $('#btn-lrc-fwd')?.addEventListener('click', () => shiftLrc(0.5));
+  $('#btn-lrc-reset')?.addEventListener('click', resetLrcOffset);
   $('#btn-lrc-calib').addEventListener('click', toggleCalib);
   $('#btn-lrc-wrong').addEventListener('click', reportLyricsWrong);
   $('#btn-wrong-submit').addEventListener('click', submitWrong);
@@ -3025,7 +2973,7 @@ function bind() {
   });
   $('#pl-add').addEventListener('click', openPlMgr);
   // 音量平衡
-  $('#btn-volume').addEventListener('click', openVolModal);
+  $('#btn-volume')?.addEventListener('click', openVolModal);
   $('#base-vol').addEventListener('input', e => {
     State.baseVolume = +e.target.value;
     localStorage.setItem(LS.baseVol, String(State.baseVolume));
