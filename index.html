@@ -467,6 +467,7 @@ body.orient-land header{display:none}
           <div id="yt-iframe-mount"></div>
           <div id="yt-iframe-mount-2" style="display:none"></div>
         </div>
+        <div class="np-title-wrap"><div class="np-title" id="np-title"><span class="np-mq">尚未選曲</span></div></div>
         <div class="np-art empty" id="np-art">
           <div class="vinyl-disc"><div class="vinyl-art" id="vinyl-art"></div></div>
           <svg class="vinyl-arm" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -525,7 +526,6 @@ body.orient-land header{display:none}
         </div>
         <!-- 隱藏:保留 DOM 給 JS 使用,避免 null 拋錯 -->
         <div style="display:none" aria-hidden="true">
-          <div id="np-title"><span class="np-mq"></span></div>
           <div id="np-artist"></div>
           <div id="lyr-box"></div>
           <button id="btn-speed"><span id="speed-badge">1×</span></button>
@@ -1166,25 +1166,44 @@ async function lrclibFetch(title, artist, duration) {
 
 async function lrclibSearchFuzzy(title, artist, duration) {
   const songName = _smartSongName(title, artist);
-  const cleanArtist = (artist || '').replace(/\s*-\s*Topic$/i,'').trim();
-  if (!songName) return null;
+  const cleanArtist = (artist || '').replace(/\s*-\s*Topic$/i,'').replace(/\s*Official.*$/i,'').trim();
+  // 從原始 title 拆出第一個括號內或第一個破折號前的可能歌名
+  const rawTitle = String(title || '').trim();
+  const dashSplit = rawTitle.split(/[-－—–]/).map(x => x.trim()).filter(Boolean);
+  const altName1 = dashSplit.length > 1 ? dashSplit[dashSplit.length - 1] : '';
+  const altName2 = dashSplit.length > 1 ? dashSplit[0] : '';
+  if (!songName && !rawTitle) return null;
   const queries = [
-    cleanArtist ? `${songName} ${cleanArtist}` : '',
-    songName,
-    cleanArtist ? `${cleanArtist} ${songName}` : '',
+    cleanArtist && songName ? `${songName} ${cleanArtist}` : '',
+    songName || '',
+    cleanArtist && songName ? `${cleanArtist} ${songName}` : '',
+    rawTitle,
+    cleanArtist ? `${rawTitle} ${cleanArtist}` : '',
+    altName1,
+    altName2,
+    cleanArtist && altName1 ? `${altName1} ${cleanArtist}` : '',
+    cleanArtist && altName2 ? `${altName2} ${cleanArtist}` : '',
   ].filter(Boolean).filter((q,i,a) => a.indexOf(q) === i);
 
+  const matchKeys = [songName, altName1, altName2, rawTitle].filter(Boolean);
   for (const q of queries) {
     try {
       const r = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q));
       if (!r.ok) continue;
       let arr = await r.json();
       if (!Array.isArray(arr) || !arr.length) continue;
-      // 過濾:歌名要對得上,有時長就再排序
-      arr = arr.filter(x => _matchesLoosely(x.name || x.trackName || '', songName));
-      if (!arr.length) continue;
-      if (duration) arr.sort((a,b) => Math.abs((a.duration||0)-duration) - Math.abs((b.duration||0)-duration));
-      const hit = arr.find(x => x.syncedLyrics) || arr.find(x => x.plainLyrics) || arr[0];
+      // 過濾:任何 match key 對得上即可
+      let filtered = arr.filter(x => {
+        const name = x.name || x.trackName || '';
+        return matchKeys.some(k => _matchesLoosely(name, k));
+      });
+      // 若無嚴格匹配,放寬:有歌手且匹配 → 接受
+      if (!filtered.length && cleanArtist) {
+        filtered = arr.filter(x => _matchesLoosely(x.artistName || '', cleanArtist));
+      }
+      const candidates = filtered.length ? filtered : arr.slice(0, 5);
+      if (duration) candidates.sort((a,b) => Math.abs((a.duration||0)-duration) - Math.abs((b.duration||0)-duration));
+      const hit = candidates.find(x => x.syncedLyrics) || candidates.find(x => x.plainLyrics) || candidates[0];
       if (hit && (hit.syncedLyrics || hit.plainLyrics)) return hit;
     } catch(_){}
   }
