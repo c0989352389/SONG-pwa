@@ -416,8 +416,7 @@ body.orient-land header{display:none}
       <div class="logo">♪</div>
       <div class="appname">SONG</div>
     </div>
-    <span style="font-size:11px;color:var(--text3);letter-spacing:1px">← 左滑設定 / 右滑歌單</span>
-    <button class="gb" id="btn-settings" title="設定" style="display:none">⚙</button>
+    <button class="gb" id="btn-settings" title="設定">⚙</button>
   </header>
 
   <main>
@@ -2990,7 +2989,7 @@ function switchPage(name) {
 }
 
 //============== Gestures ==============
-const PAGE_ORDER = ['player', 'library', 'add'];
+const PAGE_ORDER = ['library', 'add', 'player']; // 迴旋順序:歌單→搜尋→播放→歌單…
 function _currentPageName() {
   const active = document.querySelector('.page.active');
   return active ? active.id.replace('page-','') : 'player';
@@ -2998,12 +2997,14 @@ function _currentPageName() {
 function pageRight() {
   const cur = _currentPageName();
   const i = PAGE_ORDER.indexOf(cur);
-  if (i < PAGE_ORDER.length - 1) switchPage(PAGE_ORDER[i + 1]);
+  const n = (i + 1 + PAGE_ORDER.length) % PAGE_ORDER.length;
+  switchPage(PAGE_ORDER[n]);
 }
 function pageLeft() {
   const cur = _currentPageName();
   const i = PAGE_ORDER.indexOf(cur);
-  if (i > 0) switchPage(PAGE_ORDER[i - 1]);
+  const n = (i - 1 + PAGE_ORDER.length) % PAGE_ORDER.length;
+  switchPage(PAGE_ORDER[n]);
 }
 function initGestures() {
   let sx = 0, sy = 0, st = 0, tracking = false;
@@ -3018,16 +3019,20 @@ function initGestures() {
     if (dt > MAX_TIME) return;
     const ax = Math.abs(dx), ay = Math.abs(dy);
     if (ax > TH && ax > ay * 1.2) {
-      if (dx < 0) {
-        if (!document.querySelector('.modal.show')) $('#modal-settings').classList.add('show');
-      } else { pageRight(); }
+      if (dx < 0) pageLeft(); else pageRight();
       return;
     }
     if (ay > TH && ay > ax * 1.2) {
       if (dy < 0) {
-        if (_currentPageName() === 'player' && State.viewMode !== 'video') { switchMode('video'); toast('▶ YouTube 全螢幕',1500); }
+        // 上滑 → YouTube 模式
+        if (_currentPageName() === 'player') {
+          switchMode('video'); toast('▶ YouTube 模式',1500);
+        }
       } else {
-        if (_currentPageName() === 'player' && State.viewMode === 'video') switchMode('vinyl');
+        // 下滑 → 回唱片模式
+        if (_currentPageName() === 'player' && State.viewMode === 'video') {
+          switchMode('vinyl'); toast('🎵 唱片模式',1500);
+        }
       }
     }
   }
@@ -3052,9 +3057,10 @@ function initGestures() {
 
 //============== Orientation ==============
 function applyOrientation() {
-  const land = window.matchMedia('(orientation: landscape)').matches;
+  // 桌機(細指標 + 寬螢幕)強制視為直幅
+  const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
+  const land = isMobile && window.matchMedia('(orientation: landscape)').matches;
   document.body.classList.toggle('orient-land', land);
-  // 橫向 = 歌詞模式(影片隱藏);直向回唱片模式
   if (land) { if (State.viewMode !== 'lyrics') switchMode && switchMode('lyrics'); }
 }
 
@@ -3359,6 +3365,7 @@ async function init() {
   initGestures();
   applyOrientation();
   window.matchMedia('(orientation: landscape)').addEventListener('change', applyOrientation);
+  window.addEventListener('resize', applyOrientation);
   switchMode(localStorage.getItem(LS.viewMode) || 'vinyl');
   State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
   State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
