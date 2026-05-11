@@ -507,9 +507,6 @@ body.orient-land header{display:none}
           <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
         </div>
         <div class="np-ctrl">
-          <button class="small" id="btn-voice" title="語音控制" aria-label="語音控制">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-          </button>
           <button class="small" id="btn-prev" title="上一首">⏮</button>
           <button class="small" id="btn-back10" title="後退10秒">«10</button>
           <button class="play" id="btn-play" title="播放/暫停">▶</button>
@@ -597,6 +594,7 @@ body.orient-land header{display:none}
   </main>
 
   <nav>
+    <button class="nb" id="btn-voice" title="語音控制" aria-label="語音控制"><span class="ni">🎤</span><span>語音</span></button>
     <button class="nb active" data-page="player"><span class="ni">♪</span><span>播放</span></button>
     <button class="nb" data-page="library"><span class="ni">♫</span><span>歌單</span></button>
     <button class="nb" data-page="add"><span class="ni">＋</span><span>加歌</span></button>
@@ -3262,7 +3260,7 @@ function applyOrientation() {
 
 //============== Bind ==============
 function bind() {
-  $$('.nb').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
+  $$('.nb').forEach(b => b.addEventListener('click', () => { if (b.dataset.page) switchPage(b.dataset.page); }));
   $('#btn-play')?.addEventListener('click', togglePlay);
   $('#btn-prev')?.addEventListener('click', playPrev);
   $('#btn-next')?.addEventListener('click', playNext);
