@@ -382,8 +382,8 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .np-simple #np-vis > div{position:absolute;inset:0}
 .np-simple #np-vis iframe{width:100%;height:100%;border:0}
 .big-lyrics{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:14px 18px;overflow:hidden;min-height:0}
-.big-lyrics .bl-now{font-size:clamp(22px,5.5vw,32px);font-weight:700;color:#fff;text-shadow:0 0 24px color-mix(in srgb,var(--accent) 80%,transparent),0 2px 6px rgba(0,0,0,.6);line-height:1.4;letter-spacing:1px;margin-bottom:10px;transition:all .3s}
-.big-lyrics .bl-next{font-size:clamp(15px,3.6vw,20px);color:rgba(255,255,255,.42);line-height:1.4;transition:all .3s;letter-spacing:.5px}
+.big-lyrics .bl-now{font-size:clamp(28px,7.5vw,44px);font-weight:700;color:#fff;text-shadow:0 0 24px color-mix(in srgb,var(--accent) 80%,transparent),0 2px 6px rgba(0,0,0,.6);line-height:1.35;letter-spacing:1px;margin-bottom:12px;transition:all .3s}
+.big-lyrics .bl-next{font-size:clamp(18px,4.6vw,26px);color:rgba(255,255,255,.45);line-height:1.35;transition:all .3s;letter-spacing:.5px}
 .np-bottom-row{display:flex;align-items:center;gap:10px;padding:0 6px 6px;flex-shrink:0}
 .voice-fab{width:44px;height:44px;border-radius:50%;background:var(--glass);border:1px solid var(--glass-br);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit}
 .voice-fab.rec{background:var(--hot);border-color:var(--hot);color:#fff;animation:pulse 1.4s infinite}
@@ -392,13 +392,13 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .lrc-mini .offset-lbl.sm{font-family:ui-monospace,monospace;font-size:11px;color:var(--text2);padding:4px 8px;background:var(--glass);border-radius:10px;min-width:50px;text-align:center}
 /* 移除舊面板的 padding-bottom 對齊(因為 nav 拿掉了) */
 .page{padding-bottom:14px!important}
-/* 橫向佈局:歌詞置中變大,影片縮邊 */
-body.orient-land .np-simple{flex-direction:row;height:calc(100dvh - 60px);gap:14px}
-body.orient-land .np-simple #np-vis{flex:0 0 56vw;height:auto;align-self:center;aspect-ratio:16/9}
+/* 橫向佈局:只剩歌詞置中放大,影片隱藏 */
+body.orient-land .np-simple{flex-direction:column;height:100dvh;gap:14px;justify-content:center}
+body.orient-land .np-simple #np-vis{display:none!important}
 body.orient-land .big-lyrics{flex:1 1 auto;justify-content:center}
-body.orient-land .big-lyrics .bl-now{font-size:clamp(24px,3.4vw,42px)}
-body.orient-land .big-lyrics .bl-next{font-size:clamp(16px,2.4vw,26px)}
-body.orient-land .np-bottom-row{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(15,15,22,.85);backdrop-filter:blur(14px);border-radius:30px;padding:6px 12px;z-index:50}
+body.orient-land .big-lyrics .bl-now{font-size:clamp(36px,5.2vw,64px)}
+body.orient-land .big-lyrics .bl-next{font-size:clamp(22px,3.4vw,38px)}
+body.orient-land .np-bottom-row{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(15,15,22,.85);backdrop-filter:blur(14px);border-radius:30px;padding:6px 12px;z-index:50}
 body.orient-land header{display:none}
 </style>
 </head>
@@ -415,7 +415,8 @@ body.orient-land header{display:none}
       <div class="logo">♪</div>
       <div class="appname">SONG</div>
     </div>
-    <button class="gb" id="btn-settings" title="設定">⚙</button>
+    <span style="font-size:11px;color:var(--text3);letter-spacing:1px">← 左滑設定 / 右滑歌單</span>
+    <button class="gb" id="btn-settings" title="設定" style="display:none">⚙</button>
   </header>
 
   <main>
@@ -2993,55 +2994,55 @@ function pageLeft() {
 }
 function initGestures() {
   let sx = 0, sy = 0, st = 0, tracking = false;
-  const TH = 60; // 觸發距離
-  const MAX_TIME = 800; // 800ms
-  document.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1) return;
-    // 排除互動元素
-    const t = e.target;
-    if (t.closest('input, textarea, select, button, .lyr-line, .pl-tab, .chip, .song-row, [data-act], .preview-overlay, .modal, .sheet, iframe, #yt-iframe-mount, .np-bar')) return;
-    sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); tracking = true;
-  }, { passive:true });
-  document.addEventListener('touchend', e => {
+  const TH = 55;
+  const MAX_TIME = 900;
+  // 排除這些元素為起點:本來就要捲動/可點的小元素
+  const EXCLUDE = 'input,textarea,select,button,.pl-tab,.chip,.song-row,[data-act],.preview-overlay,.modal,.sheet,.np-bar,.tap-sync-bar';
+  function onStart(x, y) { sx = x; sy = y; st = Date.now(); tracking = true; }
+  function onEnd(x, y) {
     if (!tracking) return; tracking = false;
-    const t = e.changedTouches[0]; if (!t) return;
-    const dx = t.clientX - sx, dy = t.clientY - sy, dt = Date.now() - st;
+    const dx = x - sx, dy = y - sy, dt = Date.now() - st;
     if (dt > MAX_TIME) return;
     const ax = Math.abs(dx), ay = Math.abs(dy);
-    // 水平
-    if (ax > TH && ax > ay * 1.4) {
-      if (dx < 0) { // 左滑 → 設定
+    if (ax > TH && ax > ay * 1.2) {
+      if (dx < 0) {
         if (!document.querySelector('.modal.show')) $('#modal-settings').classList.add('show');
-      } else { // 右滑 → 下個頁面
-        pageRight();
-      }
+      } else { pageRight(); }
       return;
     }
-    // 垂直
-    if (ay > TH && ay > ax * 1.4) {
-      if (dy < 0) { // 上滑 → YouTube 全螢幕
-        if (_currentPageName() === 'player' && State.viewMode !== 'video') {
-          switchMode && switchMode('video');
-          toast('YouTube 全螢幕模式',1500);
-        }
+    if (ay > TH && ay > ax * 1.2) {
+      if (dy < 0) {
+        if (_currentPageName() === 'player' && State.viewMode !== 'video') { switchMode('video'); toast('▶ YouTube 全螢幕',1500); }
       } else {
-        // 下滑 → 從 video 回 vinyl
-        if (_currentPageName() === 'player' && State.viewMode === 'video') {
-          switchMode && switchMode('vinyl');
-        }
+        if (_currentPageName() === 'player' && State.viewMode === 'video') switchMode('vinyl');
       }
     }
+  }
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    if (e.target.closest && e.target.closest(EXCLUDE)) return;
+    onStart(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive:true });
+  document.addEventListener('touchend', e => {
+    const t = e.changedTouches && e.changedTouches[0]; if (!t) return;
+    onEnd(t.clientX, t.clientY);
+  }, { passive:true });
+  // 桌機滑鼠 drag(方便測試)
+  let mdown = false;
+  document.addEventListener('mousedown', e => {
+    if (e.target.closest && e.target.closest(EXCLUDE)) return;
+    if (e.button !== 0) return;
+    mdown = true; onStart(e.clientX, e.clientY);
+  });
+  document.addEventListener('mouseup', e => { if (!mdown) return; mdown = false; onEnd(e.clientX, e.clientY); });
 }
 
 //============== Orientation ==============
 function applyOrientation() {
   const land = window.matchMedia('(orientation: landscape)').matches;
   document.body.classList.toggle('orient-land', land);
-  if (land && _currentPageName() === 'player') {
-    // 橫向 → 自動切到影片模式並嘗試 fullscreen
-    if (State.viewMode !== 'video') switchMode && switchMode('video');
-  }
+  // 橫向 = 歌詞模式(影片隱藏);直向回唱片模式
+  if (land) { if (State.viewMode !== 'lyrics') switchMode && switchMode('lyrics'); }
 }
 
 //============== Bind ==============
