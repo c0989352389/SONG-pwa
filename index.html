@@ -2777,25 +2777,32 @@ async function autoClassify(s, force) {
   }
 }
 
-async function addSong(s) {
+async function addSong(s, opts={}) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
-  // 同歌手+同歌名才提示
-  const sims = _findSimilar(s.title, s.artist, null).filter(x => x.sameArtist);
-  if (sims.length) {
-    const lines = sims.slice(0, 3).map(x => `• ${x.s.title}${x.s.artist ? ' / ' + x.s.artist : ''}`).join('\n');
-    const newName = prompt(`已有同歌手的相似歌曲:\n${lines}\n\n建議加版本/年份等以區分。\n直接按確定 = 用原名加入`, s.title || '');
-    if (newName === null) { toast('已取消'); return null; }
-    if (newName.trim()) s = { ...s, title: newName.trim() };
+  // 同歌手+同歌名才提示(可跳過)
+  if (!opts.skipDupCheck) {
+    const sims = _findSimilar(s.title, s.artist, null).filter(x => x.sameArtist);
+    if (sims.length) {
+      const lines = sims.slice(0, 3).map(x => `• ${x.s.title}${x.s.artist ? ' / ' + x.s.artist : ''}`).join('\n');
+      const newName = prompt(`已有同歌手的相似歌曲:\n${lines}\n\n建議加版本/年份等以區分。\n直接按確定 = 用原名加入`, s.title || '');
+      if (newName === null) { toast('已取消'); return null; }
+      if (newName.trim()) s = { ...s, title: newName.trim() };
+    }
   }
-  // 強制選擇歌單(可選現有或新建)
-  const targetPlId = await pickPlaylistForNewSong(s);
-  if (!targetPlId) { toast('已取消'); return null; }
+  // 歌單選擇(語音/網址加歌可跳過,用當前歌單或不分類)
+  let targetPlId;
+  if (opts.skipPickPlaylist) {
+    targetPlId = State.currentPlaylistId !== 'all' ? State.currentPlaylistId : null;
+  } else {
+    targetPlId = await pickPlaylistForNewSong(s);
+    if (!targetPlId) { toast('已取消'); return null; }
+  }
   const local = {
     id: uid(), title: s.title, artist: s.artist || '', videoId: s.videoId,
     thumb: s.thumb || `https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg`,
     dur:'', addedAt: new Date().toISOString(), tag: (s.artist || '').trim(), playCount:0, lastPlay:'',
     lrc:'', note:'', translations:{}, explanations:{}, sections:[],
-    playlistIds: [targetPlId], bpm: 0
+    playlistIds: targetPlId ? [targetPlId] : [], bpm: 0
   };
   State.songs.unshift(local); saveSongsLocal(); renderLibrary();
   toast('已加入「' + (State.playlists.find(p=>p.id===targetPlId)?.name || '') + '」');
@@ -3094,7 +3101,7 @@ async function voiceSearchAndPlay(q) {
       const exist = State.songs.find(x => x.videoId === top.videoId);
       playSong(exist.id); toast('▶ ' + exist.title); endVoice(); return;
     }
-    const local = await addSong(top);
+    const local = await addSong(top, { skipPickPlaylist: true, skipDupCheck: true });
     if (local) playSong(local.id);
     toast('▶ ' + top.title); endVoice();
   } catch (e) { toast('搜尋失敗：' + (e.message || e)); endVoice(); }
