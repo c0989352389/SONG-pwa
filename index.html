@@ -401,6 +401,18 @@ body.orient-land .big-lyrics .bl-now{font-size:clamp(36px,5.2vw,64px)}
 body.orient-land .big-lyrics .bl-next{font-size:clamp(22px,3.4vw,38px)}
 body.orient-land .np-bottom-row{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(15,15,22,.85);backdrop-filter:blur(14px);border-radius:30px;padding:6px 12px;z-index:50}
 body.orient-land header{display:none}
+
+/* 浮動控制條 */
+#float-ctrl{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);z-index:300;background:rgba(15,15,22,.92);backdrop-filter:blur(18px);border:1px solid var(--glass-br);border-radius:22px;padding:14px 16px;width:min(420px,92vw);box-shadow:0 18px 50px rgba(0,0,0,.6);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
+#float-ctrl.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+#float-ctrl .fc-prog{margin-bottom:10px}
+#float-ctrl .fc-bar{height:24px;display:flex;align-items:center;position:relative;cursor:pointer;touch-action:none}
+#float-ctrl .fc-bar::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:6px;background:rgba(255,255,255,.15);border-radius:3px;pointer-events:none}
+#float-ctrl .fc-fill{position:absolute;left:0;top:50%;transform:translateY(-50%);height:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;width:0%;pointer-events:none}
+#float-ctrl .fc-times{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);font-family:ui-monospace,monospace;margin-top:4px}
+#float-ctrl .fc-btns{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#float-ctrl .fc-btn{background:var(--glass);border:1px solid var(--glass-br);color:var(--text);width:44px;height:44px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit}
+#float-ctrl .fc-btn.fc-play{width:54px;height:54px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;font-size:20px;color:#fff;box-shadow:0 6px 20px color-mix(in srgb,var(--accent) 50%,transparent)}
 </style>
 </head>
 <body>
@@ -3024,15 +3036,13 @@ function initGestures() {
     }
     if (ay > TH && ay > ax * 1.2) {
       if (dy < 0) {
-        // 上滑 → YouTube 模式
-        if (_currentPageName() === 'player') {
-          switchMode('video'); toast('▶ YouTube 模式',1500);
-        }
+        // 上滑 → 用官方 YouTube 開這首
+        const s = getCur();
+        if (s && s.videoId) { window.open(`https://www.youtube.com/watch?v=${s.videoId}`, '_blank'); toast('▶ 已在 YouTube 開啟',1800); }
+        else toast('先選一首歌');
       } else {
-        // 下滑 → 回唱片模式
-        if (_currentPageName() === 'player' && State.viewMode === 'video') {
-          switchMode('vinyl'); toast('🎵 唱片模式',1500);
-        }
+        // 下滑 → 浮出播放控制 5 秒
+        showFloatControls();
       }
     }
   }
@@ -3053,6 +3063,60 @@ function initGestures() {
     mdown = true; onStart(e.clientX, e.clientY);
   });
   document.addEventListener('mouseup', e => { if (!mdown) return; mdown = false; onEnd(e.clientX, e.clientY); });
+}
+
+//============== Floating play controls ==============
+let _floatTimer = null;
+function showFloatControls() {
+  let bar = document.getElementById('float-ctrl');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'float-ctrl';
+    bar.innerHTML = `
+      <div class="fc-prog"><div class="fc-bar" id="fc-bar"><div class="fc-fill" id="fc-fill"></div></div><div class="fc-times"><span id="fc-cur">0:00</span><span id="fc-dur">0:00</span></div></div>
+      <div class="fc-btns">
+        <button class="fc-btn" id="fc-prev">⏮</button>
+        <button class="fc-btn" id="fc-back">«10</button>
+        <button class="fc-btn fc-play" id="fc-play">▶</button>
+        <button class="fc-btn" id="fc-fwd">10»</button>
+        <button class="fc-btn" id="fc-next">⏭</button>
+      </div>`;
+    document.body.appendChild(bar);
+    bar.querySelector('#fc-prev').onclick = () => { playPrev(); _resetFloatTimer(); };
+    bar.querySelector('#fc-next').onclick = () => { playNext(); _resetFloatTimer(); };
+    bar.querySelector('#fc-back').onclick = () => { seek(-10); _resetFloatTimer(); };
+    bar.querySelector('#fc-fwd').onclick = () => { seek(10); _resetFloatTimer(); };
+    bar.querySelector('#fc-play').onclick = () => { togglePlay(); _resetFloatTimer(); };
+    // 進度條
+    const fb = bar.querySelector('#fc-bar');
+    let drag = false;
+    function pct(x){ const r = fb.getBoundingClientRect(); return Math.max(0, Math.min(1, (x - r.left)/r.width)); }
+    fb.addEventListener('pointerdown', e => { e.preventDefault(); drag = true; fb.setPointerCapture(e.pointerId); if (State.duration) State.player.seekTo(State.duration * pct(e.clientX), true); _resetFloatTimer(); });
+    fb.addEventListener('pointermove', e => { if (!drag || !State.duration) return; State.player.seekTo(State.duration * pct(e.clientX), true); });
+    fb.addEventListener('pointerup', e => { drag = false; try { fb.releasePointerCapture(e.pointerId); } catch(_){} });
+    // 進度更新
+    setInterval(() => {
+      if (bar.style.display === 'none' || !State.player || !State.player.getCurrentTime) return;
+      const t = State.player.getCurrentTime() || 0;
+      const d = State.duration || State.player.getDuration() || 0;
+      if (d) State.duration = d;
+      $('#fc-cur').textContent = fmt(t);
+      $('#fc-dur').textContent = fmt(d);
+      $('#fc-fill').style.width = ((t/(d||1))*100) + '%';
+      $('#fc-play').textContent = State.isPlaying ? '⏸' : '▶';
+    }, 300);
+  }
+  bar.style.display = 'block';
+  bar.classList.add('show');
+  _resetFloatTimer();
+}
+function _resetFloatTimer() {
+  if (_floatTimer) clearTimeout(_floatTimer);
+  _floatTimer = setTimeout(() => {
+    const bar = document.getElementById('float-ctrl');
+    if (bar) bar.classList.remove('show');
+    setTimeout(() => { if (bar && !bar.classList.contains('show')) bar.style.display = 'none'; }, 350);
+  }, 5000);
 }
 
 //============== Orientation ==============
