@@ -507,6 +507,9 @@ body.orient-land header{display:none}
           <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
         </div>
         <div class="np-ctrl">
+          <button class="small" id="btn-voice" title="語音控制" aria-label="語音控制">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          </button>
           <button class="small" id="btn-prev" title="上一首">⏮</button>
           <button class="small" id="btn-back10" title="後退10秒">«10</button>
           <button class="play" id="btn-play" title="播放/暫停">▶</button>
@@ -515,9 +518,6 @@ body.orient-land header{display:none}
         </div>
 
         <div class="np-bottom-row">
-          <button class="voice-fab" id="btn-voice" title="語音控制" aria-label="語音控制">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-          </button>
           <div class="lrc-mini">
             <button class="btn dim sm" id="btn-lrc-back" title="歌詞早 0.5 秒">⏪</button>
             <span class="offset-lbl sm" id="lrc-offset">0.0s</span>
@@ -2789,10 +2789,10 @@ async function addSong(s, opts={}) {
       if (newName.trim()) s = { ...s, title: newName.trim() };
     }
   }
-  // 歌單選擇(語音/網址加歌可跳過,用當前歌單或不分類)
+  // 歌單選擇:語音/網址加歌可跳過 — 永遠不掛分類
   let targetPlId;
   if (opts.skipPickPlaylist) {
-    targetPlId = State.currentPlaylistId !== 'all' ? State.currentPlaylistId : null;
+    targetPlId = null;
   } else {
     targetPlId = await pickPlaylistForNewSong(s);
     if (!targetPlId) { toast('已取消'); return null; }
