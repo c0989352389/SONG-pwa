@@ -1,44 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <radialGradient id="bg" cx="30%" cy="25%" r="90%">
-      <stop offset="0%" stop-color="#7b5cff"/><stop offset="45%" stop-color="#3b1f8a"/><stop offset="100%" stop-color="#0a0420"/>
-    </radialGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fff" stop-opacity=".55"/><stop offset="55%" stop-color="#fff" stop-opacity=".08"/><stop offset="100%" stop-color="#fff" stop-opacity=".22"/>
-    </linearGradient>
-    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#00f0ff"/><stop offset="50%" stop-color="#a96bff"/><stop offset="100%" stop-color="#ff4fb0"/>
-    </linearGradient>
-    <linearGradient id="hi" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fff" stop-opacity=".7"/><stop offset="40%" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-    <filter id="blur"><feGaussianBlur stdDeviation="22"/></filter>
-    <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <circle cx="120" cy="110" r="120" fill="#ff4fb0" opacity=".55" filter="url(#blur)"/>
-  <circle cx="430" cy="380" r="150" fill="#00f0ff" opacity=".45" filter="url(#blur)"/>
-  <circle cx="300" cy="220" r="110" fill="#a96bff" opacity=".55" filter="url(#blur)"/>
-  <g transform="translate(256 256)"><circle r="170" fill="url(#glass)" stroke="rgba(255,255,255,.35)" stroke-width="2"/></g>
-  <g transform="translate(256 286)" filter="url(#glow)" opacity=".55">
-    <g stroke="url(#neon)" stroke-linecap="round" stroke-width="11" fill="none">
-      <line x1="-130" y1="-22" x2="-130" y2="22"/><line x1="-94" y1="-58" x2="-94" y2="58"/>
-      <line x1="-58" y1="-86" x2="-58" y2="86"/><line x1="58" y1="-72" x2="58" y2="72"/>
-      <line x1="94" y1="-100" x2="94" y2="100"/><line x1="130" y1="-40" x2="130" y2="40"/>
-    </g>
-  </g>
-
-  <!-- Style A: Single eighth note (classic) — centered, larger flag -->
-  <g transform="translate(220 256) rotate(15)" fill="#0a0420">
-    <rect x="28" y="-118" width="12" height="150" rx="2"/>
-    <path d="M 40 -118
-             C 96 -104 112 -70 92 -36
-             C 86 -26 78 -18 70 -14
-             C 86 -28 96 -52 86 -76
-             C 78 -94 60 -106 40 -110 Z"/>
-    <ellipse cx="0" cy="36" rx="38" ry="26" transform="rotate(-20 0 36)"/>
-  </g>
-
-  <g transform="translate(256 256)"><path d="M -170 0 A 170 170 0 0 1 0 -170" fill="url(#hi)" opacity=".9"/></g>
-  <circle cx="256" cy="256" r="170" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5"/>
+<defs>
+<radialGradient id="paper" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#FBF8F2"/><stop offset="100%" stop-color="#EDE6D5"/></radialGradient>
+<radialGradient id="vinyl" cx="50%" cy="50%" r="50%"><stop offset="32%" stop-color="#2C2218"/><stop offset="100%" stop-color="#14100B"/></radialGradient>
+<radialGradient id="label" cx="35%" cy="30%" r="70%"><stop offset="0%" stop-color="#D85841"/><stop offset="100%" stop-color="#A03A22"/></radialGradient>
+<radialGradient id="gloss" cx="30%" cy="20%" r="50%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.30"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#paper)"/>
+<g transform="translate(256 256)">
+<circle r="196" fill="url(#vinyl)"/>
+<g fill="none" stroke="#5A4530" stroke-width="0.8" opacity="0.45">
+<circle r="186"/><circle r="174"/><circle r="162"/><circle r="150"/><circle r="138"/><circle r="126"/><circle r="114"/>
+</g>
+<circle r="196" fill="url(#gloss)"/>
+<circle r="98" fill="url(#label)"/>
+<circle r="98" fill="none" stroke="#D4A24C" stroke-width="2.5"/>
+<text x="0" y="6" font-family="DejaVu Serif, Liberation Serif, Times New Roman, serif" font-size="170" font-weight="700" font-style="italic" fill="#FBF1DB" text-anchor="middle" dominant-baseline="middle">S</text>
+<circle r="11" fill="#14100B"/>
+<circle r="11" fill="none" stroke="#D4A24C" stroke-width="1.5"/>
+</g>
 </svg>
