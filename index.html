@@ -1563,8 +1563,12 @@ function playSong(id) {
     } catch(e) { console.warn('playSong load fail', e); }
     setTimeout(() => { try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 800);
   } else {
+    // 限制重試次數,避免無限遞迴造成手機卡死
+    playSong._retry = (playSong._retry || 0) + 1;
+    if (playSong._retry > 8) { playSong._retry = 0; toast('播放器尚未就緒,請稍後再試'); return; }
     setTimeout(()=>playSong(id), 500); return;
   }
+  playSong._retry = 0;
   renderLibrary();
 }
 // ===== 音量平衡 =====
@@ -1586,20 +1590,30 @@ function openVolModal() {
 }
 
 function togglePlay() {
+  // 完全沒歌 → 防止後續動作
+  if (!State.songs || !State.songs.length) {
+    toast('歌單是空的,先到 ＋ 加歌');
+    return;
+  }
   if (!State.currentId) {
     const list = visibleSongs();
-    if (list.length) playSong(list[0].id); return;
+    if (list.length) playSong(list[0].id);
+    else playSong(State.songs[0].id);
+    return;
   }
-  if (!State.player) return;
+  // player 未就緒 → 不阻塞,顯示提示
+  if (!State.player || !State.ready) {
+    toast('播放器還在載入,請稍候');
+    return;
+  }
   if (State.isPlaying) { State.player.pauseVideo(); return; }
-  // 行動裝置自動播放被擋 → 強制由 playSong 在使用者觸發鏈上重 load
   const s = getCur();
+  if (!s) { toast('找不到目前歌曲'); return; }
   try {
-    const cur = State.player.getCurrentTime ? (State.player.getCurrentTime() || 0) : 0;
     const dur = State.player.getDuration ? (State.player.getDuration() || 0) : 0;
-    if (dur < 1) { playSong(State.currentId); return; }
+    if (dur < 1) { playSong(s.id); return; }
     State.player.playVideo();
-  } catch(_) { if (s) playSong(s.id); }
+  } catch(e) { console.warn('togglePlay', e); if (s) playSong(s.id); }
 }
 function _pickRandom() {
   const list = visibleSongs(); if (!list.length) return null;
