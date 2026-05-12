@@ -206,10 +206,12 @@ body.fake-fs::after{content:'✕ 結束全螢幕';position:fixed;left:50%;transf
 .np-bar .ab-marker.b{background:var(--hot)}
 .np-times{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);margin-top:6px}
 .np-ctrl{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
-.np-ctrl button{background:var(--glass);border:1px solid var(--glass-br);border-radius:50%;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);transition:all .15s;font-family:inherit}
-.np-ctrl button:hover{background:rgba(255,255,255,.12)}
-.np-ctrl .small{width:54px;height:54px;font-size:17px;font-weight:600}
-.np-ctrl .play{width:78px;height:78px;font-size:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;box-shadow:0 10px 28px color-mix(in srgb, var(--accent) 50%, transparent)}
+.np-ctrl button{position:relative;border:none;color:#e8e8ef;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s;font-family:inherit}
+.np-ctrl button::before{content:'';position:absolute;inset:2px;border-radius:11px;background:linear-gradient(180deg,rgba(255,255,255,.08) 0%,transparent 50%);pointer-events:none}
+.np-ctrl button:active{transform:scale(.96)}
+.np-ctrl .small{width:54px;height:54px;border-radius:14px;font-size:16px;font-weight:600;background:linear-gradient(135deg,#454553 0%,#1a1a22 50%,#3a3a44 100%);box-shadow:0 6px 16px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.25),inset 0 -1px 0 rgba(0,0,0,.7)}
+.np-ctrl .play{width:72px;height:72px;border-radius:18px;font-size:28px;background:linear-gradient(135deg,var(--accent2) 0%,var(--accent) 100%);color:#fff;box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 50%,transparent),inset 0 1px 0 rgba(255,255,255,.4)}
+.np-ctrl .play::before{border-radius:15px}
 .np-ctrl .voice{width:60px;height:60px;font-size:22px}
 .np-ctrl .voice.rec,.tool-btn.rec{background:var(--hot);border-color:var(--hot);color:#fff;animation:pulse 1.4s infinite}
 .np-ctrl .on{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -506,11 +508,11 @@ body.orient-land header{display:none}
           <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
         </div>
         <div class="np-ctrl">
-          <button class="small" id="btn-prev" title="上一首">⏮</button>
+          <button class="small" id="btn-prev" title="上一首"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><polygon points="18,5 7,12 18,19" fill="currentColor"/><rect x="5" y="5" width="2" height="14" fill="currentColor"/></svg></button>
           <button class="small" id="btn-back10" title="後退10秒">«10</button>
-          <button class="play" id="btn-play" title="播放/暫停">▶</button>
+          <button class="play" id="btn-play" title="播放/暫停"><svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><polygon points="7,4 21,12 7,20" fill="currentColor"/></svg></button>
           <button class="small" id="btn-fwd10" title="前進10秒">10»</button>
-          <button class="small" id="btn-next" title="下一首">⏭</button>
+          <button class="small" id="btn-next" title="下一首"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><polygon points="6,5 17,12 6,19" fill="currentColor"/><rect x="17" y="5" width="2" height="14" fill="currentColor"/></svg></button>
         </div>
 
         <div class="np-bottom-row">
@@ -1446,7 +1448,7 @@ function onPlayerState(e) {
     if (d && d !== State.duration) { State.duration = d; $('#np-dur').textContent = fmt(d); drawAbMarkers(); }
   }
   if (s === YT.PlayerState.PLAYING) {
-    State.isPlaying = true; $('#btn-play').textContent = '⏸';
+    State.isPlaying = true; $('#btn-play').innerHTML = '<svg viewBox="0 0 24 24" width="34" height="34"><rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/></svg>';
     $('#np-art').classList.add('playing');
     document.body.classList.add('playing');
     State.duration = State.player.getDuration() || 0;
@@ -1461,12 +1463,12 @@ function onPlayerState(e) {
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     startThemeCycle();
   } else if (s === YT.PlayerState.PAUSED) {
-    State.isPlaying = false; $('#btn-play').textContent = '▶';
+    State.isPlaying = false; $('#btn-play').innerHTML = '<svg viewBox="0 0 24 24" width="34" height="34"><polygon points="7,4 21,12 7,20" fill="currentColor"/></svg>';
     $('#np-art').classList.remove('playing'); document.body.classList.remove('playing'); stopProgress();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     stopThemeCycle();
   } else if (s === YT.PlayerState.ENDED) {
-    State.isPlaying = false; $('#btn-play').textContent = '▶'; stopProgress();
+    State.isPlaying = false; $('#btn-play').innerHTML = '<svg viewBox="0 0 24 24" width="34" height="34"><polygon points="7,4 21,12 7,20" fill="currentColor"/></svg>'; stopProgress();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
     stopThemeCycle();
     handleSongEnded();
