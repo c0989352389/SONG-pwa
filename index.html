@@ -3482,7 +3482,7 @@ function bind() {
       try { State.player && State.player.playVideo && State.player.playVideo(); } catch(_){}
     }, 200);
   });
-  $('#btn-lrc-tap').addEventListener('click', toggleTapSync);
+  $('#btn-lrc-tap')?.addEventListener('click', toggleTapSync);
 
   $('#btn-pl-create').addEventListener('click', createPlaylist);
   $('#pl-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createPlaylist(); });
