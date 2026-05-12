@@ -10,3 +10,6 @@ icon-d.svg
 
 # 設計稿 / 預覽檔（本機保留，不公開）
 preview-*.html
+
+# 本機部署腳本
+push.bat
