@@ -471,7 +471,6 @@ body.orient-land header{display:none}
         </div>
         <div class="np-player-vis" id="np-vis">
           <div id="yt-iframe-mount"></div>
-          <div id="yt-iframe-mount-2" style="display:none"></div>
         </div>
         <div class="np-title-wrap"><div class="np-title" id="np-title"><span class="np-mq">尚未選曲</span></div></div>
         <div class="np-art empty" id="np-art">
@@ -1377,10 +1376,6 @@ function onYouTubeIframeAPIReady() {
     onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
     onError: e => handleYtError(e.data)
   });
-  // 第二顆 player 用於 crossfade
-  State.player2 = _mkPlayer('yt-iframe-mount-2', {
-    onReady: () => { State.player2Ready = true; },
-  });
 }
 window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 // === Crossfade ===
@@ -1395,7 +1390,8 @@ function _swapPlayers() {
   if (m1) m1.id = 'yt-iframe-mount-2';
   if (m2) m2.id = 'yt-iframe-mount';
 }
-function maybeStartCrossfade() {
+function maybeStartCrossfade() { return; /* crossfade 已停用 */ }
+function _disabled_maybeStartCrossfade_old() {
   if (_fadeTimer) return;
   if (!State.player2 || !State.player2Ready) return;
   if (State.repeatMode === 1) return; // 重複本首不做 crossfade
@@ -1515,11 +1511,13 @@ function restoreLastSong() {
   const art = $('#np-art'); if (art) art.classList.remove('empty');
   const va = $('#vinyl-art'); if (va) va.style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
   parseLyrics(s.lrc || '');
-  // 若 player 已就緒,cue 進去等使用者按 ▶ 即從上次秒數續播
-  if (State.ready && State.player && State.player.cueVideoById) {
+  // 若 player 已就緒,直接從上次秒數播放(瀏覽器若阻擋自動播放會 fallback 到使用者按 ▶ 才開始)
+  if (State.ready && State.player && State.player.loadVideoById) {
     const lastSeek = +localStorage.getItem('song.lastSeek') || 0;
-    try { State.player.cueVideoById({ videoId: s.videoId, startSeconds: lastSeek }); } catch(_){}
-    applySongVolume(s);
+    try {
+      State.player.loadVideoById({ videoId: s.videoId, startSeconds: lastSeek });
+      State.player.playVideo();
+    } catch(_){}
   }
 }
 function setNpTitle(text) {
