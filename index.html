@@ -1593,7 +1593,18 @@ function togglePlay() {
     if (list.length) playSong(list[0].id); return;
   }
   if (!State.player) return;
-  if (State.isPlaying) State.player.pauseVideo(); else State.player.playVideo();
+  if (State.isPlaying) { State.player.pauseVideo(); return; }
+  // 還沒真正播過(剛開機 cueVideoById 後從 0:00 開始)→ 直接重新 loadVideoById 強制播放
+  try {
+    const cur = State.player.getCurrentTime ? (State.player.getCurrentTime() || 0) : 0;
+    const dur = State.player.getDuration ? (State.player.getDuration() || 0) : 0;
+    if (dur < 1 || cur < 0.1) {
+      // 視為尚未真正載入,用 playSong 從頭強制觸發
+      playSong(State.currentId);
+      return;
+    }
+  } catch(_){}
+  try { State.player.playVideo(); } catch(_){}
 }
 function _pickRandom() {
   const list = visibleSongs(); if (!list.length) return null;
