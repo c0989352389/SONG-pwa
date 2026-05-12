@@ -758,16 +758,7 @@ body.orient-land header{display:none}
   </div>
 </div>
 
-<script src="https://www.youtube.com/iframe_api" onerror="window._ytLoadFailed=true"></script>
-<script>
-// 5 秒後檢查 YT API 有沒有載入,沒有就改用後備方案(直接連 YT 觀看)
-setTimeout(() => {
-  if (typeof YT === 'undefined' || !YT.Player) {
-    window._ytLoadFailed = true;
-    console.warn('YouTube iframe API failed to load - tracking prevention or network blocking?');
-  }
-}, 5000);
-</script>
+<script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 'use strict';
@@ -1368,88 +1359,23 @@ async function submitWrong() {
   } catch(e) { toast('重找失敗: ' + e.message); }
 }
 
-//============== YouTube IFrame ==============
-function _mkPlayer(hostId, extra) {
-  const host = document.getElementById(hostId);
-  if (!host) return null;
-  return new YT.Player(host, {
+//============== YouTube IFrame (B 簡化版) ==============
+function onYouTubeIframeAPIReady() {
+  const host = document.getElementById('yt-iframe-mount');
+  if (!host) return;
+  State.player = new YT.Player(host, {
     height:'100%', width:'100%',
     playerVars: { playsinline:1, controls:0, rel:0, modestbranding:1, iv_load_policy:3 },
-    events: extra
-  });
-}
-function onYouTubeIframeAPIReady() {
-  State.player = _mkPlayer('yt-iframe-mount', {
-    onReady: () => {
-      State.ready = true; State.player.setPlaybackRate(State.speed);
-      restoreLastSong();
-    },
-    onStateChange: onPlayerState,
-    onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
-    onError: e => handleYtError(e.data)
+    events: {
+      onReady: () => { State.ready = true; restoreLastSong(); },
+      onStateChange: onPlayerState,
+      onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
+      onError: e => handleYtError(e.data)
+    }
   });
 }
 window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
-// === Crossfade ===
-const FADE_SEC = 3;
-let _fadeTimer = null;
-function _swapPlayers() {
-  // 交換 player 引用 + 顯示狀態(讓新歌的 iframe 變主視覺)
-  const m1 = document.getElementById('yt-iframe-mount');
-  const m2 = document.getElementById('yt-iframe-mount-2');
-  if (m1 && m2) { m1.style.display = 'none'; m2.style.display = ''; }
-  const tmp = State.player; State.player = State.player2; State.player2 = tmp;
-  if (m1) m1.id = 'yt-iframe-mount-2';
-  if (m2) m2.id = 'yt-iframe-mount';
-}
-function maybeStartCrossfade() { return; /* crossfade 已停用 */ }
-function _disabled_maybeStartCrossfade_old() {
-  if (_fadeTimer) return;
-  if (!State.player2 || !State.player2Ready) return;
-  if (State.repeatMode === 1) return; // 重複本首不做 crossfade
-  const dur = State.duration;
-  if (!dur || dur < 30) return; // duration 還沒抓到 / 短到不合理就跳過
-  const cur = State.player && State.player.getCurrentTime ? State.player.getCurrentTime() : 0;
-  if (cur < 5) return; // 歌曲還沒真正開始播
-  if (dur - cur > FADE_SEC + 0.5) return; // 還沒到尾段
-  // 找下一首
-  let nextSong;
-  if (State.shuffleOn) nextSong = _pickRandom();
-  else {
-    const list = visibleSongs();
-    const i = list.findIndex(s => s.id === State.currentId);
-    nextSong = list[(i + 1) % list.length];
-    if (i >= list.length - 1 && State.repeatMode !== 2) return; // 最後一首不繞回
-  }
-  if (!nextSong) return;
-  // 預載 player2 並開始 crossfade
-  try { State.player2.loadVideoById(nextSong.videoId); } catch(_) { return; }
-  try { State.player2.setVolume(0); } catch(_){}
-  try { State.player2.playVideo(); } catch(_){}
-  const steps = 30, every = (FADE_SEC * 1000) / steps;
-  let n = 0;
-  _fadeTimer = setInterval(() => {
-    n++;
-    const v1 = Math.max(0, 100 - (100 * n / steps));
-    const v2 = Math.min(100, 100 * n / steps);
-    try { State.player.setVolume(v1); } catch(_){}
-    try { State.player2.setVolume(v2); } catch(_){}
-    if (n >= steps) {
-      clearInterval(_fadeTimer); _fadeTimer = null;
-      try { State.player.stopVideo(); } catch(_){}
-      try { State.player.setVolume(100); } catch(_){}
-      _swapPlayers();
-      State.currentId = nextSong.id;
-      localStorage.setItem(LS.current, nextSong.id);
-      setNpTitle(nextSong.title || '');
-      $('#np-artist').textContent = nextSong.artist || '';
-      parseLyrics(nextSong.lrc || '');
-      State.duration = 0; // 讓下次 onStateChange 重新計算
-      bumpPlayCount(nextSong.id);
-      renderLibrary();
-    }
-  }, every);
-}
+function maybeStartCrossfade() { /* B 方案已停用 crossfade */ }
 
 function onPlayerState(e) {
   const s = e.data;
@@ -1498,7 +1424,6 @@ function startProgress() {
     $('#np-fill').style.width = pct + '%';
     $('#np-knob').style.left = pct + '%';
     syncLyric(t);
-    maybeStartCrossfade();
     // 每 2 秒記住目前秒數,下次開啟可從這裡繼續
     if (Math.floor(t) % 2 === 0) localStorage.setItem('song.lastSeek', String(Math.floor(t)));
     if (State.ab.on && State.ab.b !== null && t >= State.ab.b) {
@@ -1564,23 +1489,14 @@ function playSong(id) {
   State.ab = { a: null, b: null, on: false };
   drawAbButtons(); drawAbMarkers();
   // 隨機主題:換歌時換新色
-  // 只要 player 物件存在就試,不再卡 State.ready
-  if (State.player && State.player.loadVideoById) {
-    try {
-      State.player.loadVideoById({ videoId: s.videoId, startSeconds: 0 });
-      State.player.playVideo();
-    } catch(e) { console.warn('playSong load fail', e); }
-    setTimeout(() => { try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 800);
-  } else {
-    playSong._retry = (playSong._retry || 0) + 1;
-    if (playSong._retry > 12) {
-      playSong._retry = 0;
-      toast('播放器載入失敗,瀏覽器可能擋了 YouTube。請關閉追蹤防護或換 Chrome 試試',6000);
-      return;
-    }
-    setTimeout(()=>playSong(id), 500); return;
+  if (!State.player || !State.player.loadVideoById) {
+    toast('播放器未就緒,請稍候再試');
+    return;
   }
-  playSong._retry = 0;
+  try {
+    State.player.loadVideoById({ videoId: s.videoId, startSeconds: 0 });
+    State.player.playVideo();
+  } catch(e) { console.warn('playSong load fail', e); toast('播放失敗: ' + e.message); }
   renderLibrary();
 }
 // ===== 音量平衡 =====
@@ -1602,30 +1518,15 @@ function openVolModal() {
 }
 
 function togglePlay() {
-  // 完全沒歌 → 防止後續動作
-  if (!State.songs || !State.songs.length) {
-    toast('歌單是空的,先到 ＋ 加歌');
-    return;
-  }
-  if (!State.currentId) {
-    const list = visibleSongs();
-    if (list.length) playSong(list[0].id);
-    else playSong(State.songs[0].id);
-    return;
-  }
-  if (State.isPlaying && State.player) { try { State.player.pauseVideo(); } catch(_){} return; }
-  const s = getCur();
-  if (!s) { toast('找不到目前歌曲'); return; }
-  // 直接嘗試播放(不管 State.ready,YT API 本身會處理 not-ready 狀態)
-  try {
-    if (State.player && State.player.getDuration) {
-      const dur = State.player.getDuration() || 0;
-      if (dur < 1) { playSong(s.id); return; }
-      State.player.playVideo();
-    } else {
-      playSong(s.id);
-    }
-  } catch(e) { console.warn('togglePlay', e); playSong(s.id); }
+  if (!State.songs.length) { toast('歌單是空的'); return; }
+  if (!State.currentId) { playSong(State.songs[0].id); return; }
+  if (!State.player || !State.player.playVideo) { toast('播放器未就緒'); return; }
+  if (State.isPlaying) { try { State.player.pauseVideo(); } catch(_){} return; }
+  // 還沒實際載入過 → 重新走 playSong
+  let dur = 0;
+  try { dur = State.player.getDuration ? (State.player.getDuration() || 0) : 0; } catch(_){}
+  if (dur < 1) { playSong(State.currentId); return; }
+  try { State.player.playVideo(); } catch(_){}
 }
 function _pickRandom() {
   const list = visibleSongs(); if (!list.length) return null;
