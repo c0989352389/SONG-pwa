@@ -523,8 +523,9 @@ body.orient-land header{display:none}
             <button class="btn sm" id="btn-lrc-tap" title="逐句打點">🎵</button>
             <button class="btn sm" id="btn-edit-lrc" title="編輯歌詞">📝</button>
             <button class="btn danger sm" id="btn-lrc-wrong" title="報錯重找">🚫</button>
-            <button class="btn sm" id="btn-shuffle" title="隨機">🔀</button>
-            <button class="btn sm" id="btn-repeat" title="重複">🔁<span class="badge" id="repeat-badge" style="display:none">1</span></button>
+            <button class="btn sm" id="btn-shuffle" title="本歌單隨機">🔀</button>
+            <button class="btn sm" id="btn-shuffle-all" title="所有歌曲隨機">🎲</button>
+            <button class="btn sm" id="btn-repeat" title="循環模式">🔁<span class="badge" id="repeat-badge" style="display:none">1</span></button>
           </div>
         </div>
         <!-- 隱藏:保留 DOM 給 JS 使用,避免 null 拋錯 -->
@@ -1511,13 +1512,10 @@ function restoreLastSong() {
   const art = $('#np-art'); if (art) art.classList.remove('empty');
   const va = $('#vinyl-art'); if (va) va.style.backgroundImage = s.thumb ? `url('${s.thumb}')` : '';
   parseLyrics(s.lrc || '');
-  // 若 player 已就緒,直接從上次秒數播放(瀏覽器若阻擋自動播放會 fallback 到使用者按 ▶ 才開始)
-  if (State.ready && State.player && State.player.loadVideoById) {
+  // 預先 cue,等使用者按 ▶ 即從上次秒數開始(避免行動裝置 autoplay 被擋造成卡死)
+  if (State.ready && State.player && State.player.cueVideoById) {
     const lastSeek = +localStorage.getItem('song.lastSeek') || 0;
-    try {
-      State.player.loadVideoById({ videoId: s.videoId, startSeconds: lastSeek });
-      State.player.playVideo();
-    } catch(_){}
+    try { State.player.cueVideoById({ videoId: s.videoId, startSeconds: lastSeek }); } catch(_){}
   }
 }
 function setNpTitle(text) {
@@ -1592,17 +1590,14 @@ function togglePlay() {
   }
   if (!State.player) return;
   if (State.isPlaying) { State.player.pauseVideo(); return; }
-  // 還沒真正播過(剛開機 cueVideoById 後從 0:00 開始)→ 直接重新 loadVideoById 強制播放
+  // 行動裝置自動播放被擋 → 強制由 playSong 在使用者觸發鏈上重 load
+  const s = getCur();
   try {
     const cur = State.player.getCurrentTime ? (State.player.getCurrentTime() || 0) : 0;
     const dur = State.player.getDuration ? (State.player.getDuration() || 0) : 0;
-    if (dur < 1 || cur < 0.1) {
-      // 視為尚未真正載入,用 playSong 從頭強制觸發
-      playSong(State.currentId);
-      return;
-    }
-  } catch(_){}
-  try { State.player.playVideo(); } catch(_){}
+    if (dur < 1) { playSong(State.currentId); return; }
+    State.player.playVideo();
+  } catch(_) { if (s) playSong(s.id); }
 }
 function _pickRandom() {
   const list = visibleSongs(); if (!list.length) return null;
@@ -1663,10 +1658,10 @@ function updatePlayModeUI() {
   const badge = $('#repeat-badge');
   if (rb) {
     rb.classList.toggle('on', State.repeatMode > 0);
-    rb.title = ['重複(關)', '重複本首', '重複整個歌單'][State.repeatMode];
+    rb.title = ['不循環(關)', '單曲循環', '循環整張歌單'][State.repeatMode];
     if (badge) {
+      // 只有「單曲循環」顯示 1 角標,「循環整張歌單」只亮燈
       if (State.repeatMode === 1) { badge.textContent = '1'; badge.style.display = ''; }
-      else if (State.repeatMode === 2) { badge.textContent = '∞'; badge.style.display = ''; }
       else { badge.style.display = 'none'; }
     }
   }
@@ -3271,6 +3266,12 @@ function bind() {
   $('#btn-prev')?.addEventListener('click', playPrev);
   $('#btn-next')?.addEventListener('click', playNext);
   $('#btn-shuffle')?.addEventListener('click', toggleShuffle);
+  $('#btn-shuffle-all')?.addEventListener('click', () => {
+    if (!State.songs.length) { toast('歌單是空的'); return; }
+    let i; do { i = Math.floor(Math.random()*State.songs.length); } while (State.songs.length>1 && State.songs[i].id === State.currentId);
+    playSong(State.songs[i].id);
+    toast('🎲 從全部歌曲隨機');
+  });
   $('#btn-repeat')?.addEventListener('click', cycleRepeat);
   $('#btn-back10')?.addEventListener('click', ()=>seek(-10));
   $('#btn-fwd10')?.addEventListener('click', ()=>seek(10));
