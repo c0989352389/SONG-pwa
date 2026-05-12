@@ -1558,14 +1558,12 @@ function playSong(id) {
   drawAbButtons(); drawAbMarkers();
   // 隨機主題:換歌時換新色
   if (State.ready && State.player && State.player.loadVideoById) {
-    State.player.loadVideoById(s.videoId);
-    setTimeout(() => {
-      try {
-        State.player.setPlaybackRate(State.speed);
-        State.player.playVideo();      // 確保自動播放
-        applySongVolume(s);            // 套用該首歌的音量偏移(平衡)
-      } catch(_){}
-    }, 600);
+    // loadVideoById 預設會自動播放,不要等 600ms 再 playVideo(會被 iOS 視為非使用者觸發)
+    try {
+      State.player.loadVideoById({ videoId: s.videoId, startSeconds: 0 });
+      State.player.playVideo();
+    } catch(e) { console.warn('playSong load fail', e); }
+    setTimeout(() => { try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 800);
   } else {
     setTimeout(()=>playSong(id), 500); return;
   }
@@ -1615,24 +1613,27 @@ function playPrev() {
   const p = list[(i-1+list.length) % list.length]; playSong(p.id);
 }
 function handleSongEnded() {
-  // 重複本首
   if (State.repeatMode === 1) {
     try { State.player.seekTo(0, true); State.player.playVideo(); } catch(_){}
     return;
   }
-  // 隨機
   if (State.shuffleOn) {
     const n = _pickRandom(); if (n) playSong(n.id); return;
   }
-  // 重複整個歌單(包尾繞回)
-  const list = visibleSongs(); if (!list.length) return;
-  const i = list.findIndex(s => s.id === State.currentId);
+  // 候選清單:目前歌單;若當前歌不在,改用 State.songs(全部)
+  let list = visibleSongs();
+  let i = list.findIndex(s => s.id === State.currentId);
+  if (i < 0) { list = State.songs; i = list.findIndex(s => s.id === State.currentId); }
+  if (!list.length) return;
   if (State.repeatMode === 2) {
-    const n = list[(i+1) % list.length]; playSong(n.id); return;
+    const n = list[((i < 0 ? -1 : i) + 1 + list.length) % list.length];
+    if (n) playSong(n.id);
+    return;
   }
-  // 預設:播完整個歌單就停
-  if (i >= 0 && i < list.length - 1) playSong(list[i+1].id);
-  // else: 已是最後一首,停止
+  // 預設:播下一首;若是最後一首或不在清單,從第一首開始
+  if (i < 0) { playSong(list[0].id); return; }
+  if (i < list.length - 1) { playSong(list[i+1].id); return; }
+  // 真的最後一首才停
 }
 function toggleShuffle() {
   State.shuffleOn = !State.shuffleOn;
