@@ -1555,17 +1555,17 @@ function playSong(id) {
   State.ab = { a: null, b: null, on: false };
   drawAbButtons(); drawAbMarkers();
   // 隨機主題:換歌時換新色
-  if (State.ready && State.player && State.player.loadVideoById) {
-    // loadVideoById 預設會自動播放,不要等 600ms 再 playVideo(會被 iOS 視為非使用者觸發)
+  // 只要 player 物件存在就試,不再卡 State.ready
+  if (State.player && State.player.loadVideoById) {
     try {
       State.player.loadVideoById({ videoId: s.videoId, startSeconds: 0 });
       State.player.playVideo();
     } catch(e) { console.warn('playSong load fail', e); }
     setTimeout(() => { try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 800);
   } else {
-    // 限制重試次數,避免無限遞迴造成手機卡死
+    // YT API 還沒建立 player → 限制重試
     playSong._retry = (playSong._retry || 0) + 1;
-    if (playSong._retry > 8) { playSong._retry = 0; toast('播放器尚未就緒,請稍後再試'); return; }
+    if (playSong._retry > 8) { playSong._retry = 0; toast('YouTube 播放器載入失敗,請重整'); return; }
     setTimeout(()=>playSong(id), 500); return;
   }
   playSong._retry = 0;
@@ -1601,19 +1601,19 @@ function togglePlay() {
     else playSong(State.songs[0].id);
     return;
   }
-  // player 未就緒 → 不阻塞,顯示提示
-  if (!State.player || !State.ready) {
-    toast('播放器還在載入,請稍候');
-    return;
-  }
-  if (State.isPlaying) { State.player.pauseVideo(); return; }
+  if (State.isPlaying && State.player) { try { State.player.pauseVideo(); } catch(_){} return; }
   const s = getCur();
   if (!s) { toast('找不到目前歌曲'); return; }
+  // 直接嘗試播放(不管 State.ready,YT API 本身會處理 not-ready 狀態)
   try {
-    const dur = State.player.getDuration ? (State.player.getDuration() || 0) : 0;
-    if (dur < 1) { playSong(s.id); return; }
-    State.player.playVideo();
-  } catch(e) { console.warn('togglePlay', e); if (s) playSong(s.id); }
+    if (State.player && State.player.getDuration) {
+      const dur = State.player.getDuration() || 0;
+      if (dur < 1) { playSong(s.id); return; }
+      State.player.playVideo();
+    } else {
+      playSong(s.id);
+    }
+  } catch(e) { console.warn('togglePlay', e); playSong(s.id); }
 }
 function _pickRandom() {
   const list = visibleSongs(); if (!list.length) return null;
