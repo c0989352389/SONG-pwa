@@ -515,12 +515,10 @@ body.orient-land header{display:none}
 
         <div class="np-bottom-row">
           <div class="lrc-mini">
-            <button class="btn dim sm" id="btn-lrc-back" title="歌詞早 0.5 秒">⏪</button>
+            <button class="btn dim sm" id="btn-lrc-back" title="歌詞早 0.5 秒">−</button>
             <span class="offset-lbl sm" id="lrc-offset">0.0s</span>
-            <button class="btn dim sm" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">⏩</button>
+            <button class="btn dim sm" id="btn-lrc-fwd" title="歌詞晚 0.5 秒">＋</button>
             <button class="btn sm" id="btn-lrc-anchor" title="以當前時間定位第一句歌詞">📍</button>
-            <button class="btn sm" id="btn-lrc-calib" title="點句校正">🎯</button>
-            <button class="btn sm" id="btn-lrc-tap" title="逐句打點">🎵</button>
             <button class="btn sm" id="btn-edit-lrc" title="編輯歌詞">📝</button>
             <button class="btn danger sm" id="btn-lrc-wrong" title="報錯重找">🚫</button>
             <button class="btn sm" id="btn-shuffle" title="本歌單隨機">🔀</button>
@@ -3263,6 +3261,9 @@ function applyOrientation() {
 function bind() {
   $$('.nb').forEach(b => b.addEventListener('click', () => { if (b.dataset.page) switchPage(b.dataset.page); }));
   $('#btn-play')?.addEventListener('click', togglePlay);
+  // 點 vinyl / 大歌詞區也可切換播放/暫停
+  document.querySelector('.np-art')?.addEventListener('click', togglePlay);
+  document.querySelector('.big-lyrics')?.addEventListener('click', togglePlay);
   $('#btn-prev')?.addEventListener('click', playPrev);
   $('#btn-next')?.addEventListener('click', playNext);
   $('#btn-shuffle')?.addEventListener('click', toggleShuffle);
