@@ -1387,17 +1387,13 @@ window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 const FADE_SEC = 3;
 let _fadeTimer = null;
 function _swapPlayers() {
-  // 把 player2 → player(交換 iframe 顯示)
+  // 交換 player 引用 + 顯示狀態(讓新歌的 iframe 變主視覺)
   const m1 = document.getElementById('yt-iframe-mount');
   const m2 = document.getElementById('yt-iframe-mount-2');
   if (m1 && m2) { m1.style.display = 'none'; m2.style.display = ''; }
   const tmp = State.player; State.player = State.player2; State.player2 = tmp;
-  const tmpMount = 'yt-iframe-mount';
-  // 翻轉:讓下次新的 fade 用反向 mount
   if (m1) m1.id = 'yt-iframe-mount-2';
   if (m2) m2.id = 'yt-iframe-mount';
-  if (m1) m1.style.display = '';
-  if (m2) m2.style.display = 'none';
 }
 function maybeStartCrossfade() {
   if (_fadeTimer) return;
