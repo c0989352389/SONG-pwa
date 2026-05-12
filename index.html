@@ -758,7 +758,16 @@ body.orient-land header{display:none}
   </div>
 </div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://www.youtube.com/iframe_api" onerror="window._ytLoadFailed=true"></script>
+<script>
+// 5 秒後檢查 YT API 有沒有載入,沒有就改用後備方案(直接連 YT 觀看)
+setTimeout(() => {
+  if (typeof YT === 'undefined' || !YT.Player) {
+    window._ytLoadFailed = true;
+    console.warn('YouTube iframe API failed to load - tracking prevention or network blocking?');
+  }
+}, 5000);
+</script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 'use strict';
@@ -1563,9 +1572,20 @@ function playSong(id) {
     } catch(e) { console.warn('playSong load fail', e); }
     setTimeout(() => { try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 800);
   } else {
-    // YT API 還沒建立 player → 限制重試
+    // YT API 載入失敗 → 後備:在新分頁開 YouTube
+    if (window._ytLoadFailed) {
+      window.open(`https://www.youtube.com/watch?v=${s.videoId}`, '_blank');
+      toast('YT API 被擋(可能是追蹤防護),已在 YouTube 開啟',4000);
+      return;
+    }
     playSong._retry = (playSong._retry || 0) + 1;
-    if (playSong._retry > 8) { playSong._retry = 0; toast('YouTube 播放器載入失敗,請重整'); return; }
+    if (playSong._retry > 8) {
+      playSong._retry = 0;
+      window._ytLoadFailed = true;
+      window.open(`https://www.youtube.com/watch?v=${s.videoId}`, '_blank');
+      toast('YT 播放器無法在此瀏覽器載入,已改用 YouTube 開啟',4000);
+      return;
+    }
     setTimeout(()=>playSong(id), 500); return;
   }
   playSong._retry = 0;
