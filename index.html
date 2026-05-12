@@ -403,7 +403,7 @@ body.mode-lyrics .np-simple .big-lyrics .bl-next{font-size:clamp(20px,5vw,30px)}
 #vis-overlay{position:absolute;inset:0;z-index:5;background:transparent;cursor:grab}
 .big-lyrics{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:14px 18px;overflow:hidden;min-height:0}
 .big-lyrics .bl-prev{font-size:clamp(16px,4vw,22px);color:rgba(255,255,255,.32);line-height:1.35;margin-bottom:10px;transition:all .3s;letter-spacing:.5px}
-.big-lyrics .bl-now{font-size:clamp(28px,7.5vw,44px);font-weight:700;color:#fff;text-shadow:0 0 24px color-mix(in srgb,var(--accent) 80%,transparent),0 2px 6px rgba(0,0,0,.6);line-height:1.35;letter-spacing:1px;margin-bottom:10px;transition:all .3s}
+.big-lyrics .bl-now{font-size:clamp(28px,7.5vw,44px);font-weight:700;line-height:1.35;letter-spacing:1px;margin-bottom:10px;transition:font-size .3s;background:linear-gradient(90deg,var(--accent2) 0%,var(--accent) var(--karaoke-p,0%),rgba(255,255,255,.85) var(--karaoke-p,0%),rgba(255,255,255,.85) 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 24px color-mix(in srgb,var(--accent) 50%,transparent)}
 .big-lyrics .bl-next{font-size:clamp(16px,4vw,22px);color:rgba(255,255,255,.32);line-height:1.35;transition:all .3s;letter-spacing:.5px}
 .np-bottom-row{display:flex;align-items:center;gap:10px;padding:0 6px 6px;flex-shrink:0}
 .voice-fab{width:44px;height:44px;border-radius:50%;background:var(--glass);border:1px solid var(--glass-br);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit}
@@ -528,6 +528,8 @@ body.orient-land header{display:none}
             <button class="btn sm" id="btn-shuffle" title="本歌單隨機">🔀</button>
             <button class="btn sm" id="btn-shuffle-all" title="所有歌曲隨機">🎲</button>
             <button class="btn sm" id="btn-repeat" title="循環模式">🔁<span class="badge" id="repeat-badge" style="display:none">1</span></button>
+            <button class="btn sm" id="btn-karaoke" title="K歌:找伴奏版本">🎤</button>
+            <button class="btn sm" id="btn-record" title="K歌錄音(按住錄音)">🎙️</button>
           </div>
         </div>
         <!-- 隱藏:保留 DOM 給 JS 使用,避免 null 拋錯 -->
@@ -659,6 +661,39 @@ body.orient-land header{display:none}
   </div>
 
   <!-- Report wrong lyrics -->
+  <!-- 卡拉 OK 伴奏搜尋 -->
+  <div class="modal" id="modal-karaoke">
+    <div class="modal-card">
+      <div class="modal-h"><h3>🎤 找伴奏版本</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+        搜尋當前歌曲的「伴奏 / instrumental / karaoke」版本,點擊切換播放。
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input type="text" id="kara-q" placeholder="關鍵字(歌名+伴奏)" style="flex:1">
+        <button class="btn pri" id="kara-search">搜尋</button>
+      </div>
+      <div id="kara-results" class="results"><div class="empty"><div class="empty-t">輸入歌名或直接點搜尋</div></div></div>
+    </div>
+  </div>
+
+  <!-- 錄音 -->
+  <div class="modal" id="modal-record">
+    <div class="modal-card">
+      <div class="modal-h"><h3>🎙️ K歌錄音</h3><button class="gb" data-close>✕</button></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">
+        按住下方紅鈕錄音,放開停止。錄完可立即試聽 / 下載。
+      </div>
+      <div style="text-align:center;margin:20px 0">
+        <button id="rec-btn" style="width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,#ff6b6b,#c92a2a);border:none;color:#fff;font-size:48px;cursor:pointer;box-shadow:0 12px 32px rgba(201,42,42,.5);transition:transform .15s">🎙️</button>
+        <div id="rec-status" style="margin-top:14px;color:var(--text2);font-size:13px">按住按鈕開始錄音</div>
+      </div>
+      <audio id="rec-audio" controls style="width:100%;display:none;margin-top:10px"></audio>
+      <div style="margin-top:10px;text-align:center">
+        <a id="rec-dl" style="color:var(--accent2);font-size:13px;display:none">⬇ 下載錄音</a>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="modal-wrong">
     <div class="modal-card">
       <div class="modal-h"><h3>🚫 標記歌詞錯誤,重找</h3><button class="gb" data-close>✕</button></div>
@@ -1875,13 +1910,26 @@ function _fmtLrcStamp(t) {
   return String(m).padStart(2, '0') + ':' + String(s).padStart(5, '0');
 }
 function syncLyric(t) {
-  if (!State.lyrics.length) { _updateBigLyrics(-1); return; }
+  if (!State.lyrics.length) { _updateBigLyrics(-1); _updateKaraokeFill(0); return; }
   const offset = (getCur()?.lrcOffset) || 0;
   const adjT = t - offset;
   let idx = -1;
   for (let i = 0; i < State.lyrics.length; i++) {
     if (State.lyrics[i].t < 0) continue;
     if (State.lyrics[i].t <= adjT) idx = i; else break;
+  }
+  // 卡拉OK漸進填字:即使在同一行也持續更新
+  if (idx >= 0) {
+    const cur = State.lyrics[idx];
+    let nextT = null;
+    for (let i = idx + 1; i < State.lyrics.length; i++) {
+      if (State.lyrics[i].t >= 0) { nextT = State.lyrics[i].t; break; }
+    }
+    const dur = (nextT !== null) ? (nextT - cur.t) : 4; // 最後一句假設 4 秒
+    const pct = Math.max(0, Math.min(100, ((adjT - cur.t) / dur) * 100));
+    _updateKaraokeFill(pct);
+  } else {
+    _updateKaraokeFill(0);
   }
   if (idx === State.activeLyricIdx) return;
   State.activeLyricIdx = idx;
@@ -1895,6 +1943,10 @@ function syncLyric(t) {
       if (el) el.classList.add('active');
     }
   }
+}
+function _updateKaraokeFill(pct) {
+  const el = document.querySelector('.big-lyrics .bl-now');
+  if (el) el.style.setProperty('--karaoke-p', pct + '%');
 }
 function _updateBigLyrics(idx) {
   const prevEl = document.querySelector('.big-lyrics .bl-prev');
@@ -3201,6 +3253,11 @@ function bind() {
   $('#btn-prev')?.addEventListener('click', playPrev);
   $('#btn-next')?.addEventListener('click', playNext);
   $('#btn-shuffle')?.addEventListener('click', toggleShuffle);
+  $('#btn-karaoke')?.addEventListener('click', openKaraokeSearch);
+  $('#kara-search')?.addEventListener('click', doKaraokeSearch);
+  $('#kara-q')?.addEventListener('keydown', e => { if (e.key === 'Enter') doKaraokeSearch(); });
+  initRecorder();
+  $('#btn-record')?.addEventListener('click', () => $('#modal-record').classList.add('show'));
   $('#btn-shuffle-all')?.addEventListener('click', () => {
     if (!State.songs.length) { toast('歌單是空的'); return; }
     let i; do { i = Math.floor(Math.random()*State.songs.length); } while (State.songs.length>1 && State.songs[i].id === State.currentId);
@@ -3491,6 +3548,94 @@ function bind() {
   $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('show')));
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheet));
+}
+
+//============== 卡拉OK ==============
+function openKaraokeSearch() {
+  const s = getCur();
+  const guess = s ? `${_smartSongName(s.title, s.artist) || s.title} 伴奏` : '';
+  $('#kara-q').value = guess;
+  $('#kara-results').innerHTML = '<div class="empty"><div class="empty-t">點上方搜尋,找伴奏/instrumental/karaoke 版本</div></div>';
+  $('#modal-karaoke').classList.add('show');
+  if (guess) setTimeout(doKaraokeSearch, 100);
+}
+async function doKaraokeSearch() {
+  const q = $('#kara-q').value.trim(); if (!q) return;
+  if (!State.settings.ytKey) { toast('需要 YouTube API Key'); return; }
+  const list = $('#kara-results');
+  list.innerHTML = '<div class="empty"><div class="empty-t"><span class="spinner"></span> 搜尋中…</div></div>';
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(q + ' instrumental karaoke')}&key=${State.settings.ytKey}`;
+    const r = await fetch(url);
+    if (!r.ok) { list.innerHTML = '<div class="empty"><div class="empty-t">搜尋失敗</div></div>'; return; }
+    const j = await r.json();
+    const items = (j.items || []).filter(it => it.id && it.id.videoId).map(it => ({
+      videoId: it.id.videoId, title: it.snippet.title, artist: it.snippet.channelTitle,
+      thumb: (it.snippet.thumbnails.medium || it.snippet.thumbnails.default).url
+    }));
+    if (!items.length) { list.innerHTML = '<div class="empty"><div class="empty-t">沒結果</div></div>'; return; }
+    list.innerHTML = items.map(it => `
+      <div class="result-row" data-kara-vid="${it.videoId}" style="cursor:pointer">
+        <div class="result-main">
+          <img src="${it.thumb}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0">
+          <div class="song-info" style="flex:1;min-width:0;overflow:hidden">
+            <div class="song-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:600">${escapeHtml(it.title)}</div>
+            <div class="song-meta" style="font-size:11px;color:var(--text2)">${escapeHtml(it.artist)}</div>
+          </div>
+          <button class="btn pri sm" style="flex-shrink:0">▶ 播</button>
+        </div>
+      </div>`).join('');
+    list.querySelectorAll('[data-kara-vid]').forEach(row => {
+      row.addEventListener('click', () => {
+        const vid = row.dataset.karaVid;
+        // 暫時切換播放,不存進歌單
+        if (State.player && State.player.loadVideoById) {
+          try { State.player.loadVideoById({ videoId: vid, startSeconds: 0 }); State.player.playVideo(); } catch(_){}
+          $('#modal-karaoke').classList.remove('show');
+          toast('▶ 切到伴奏版(原歌曲記錄仍保留)', 3000);
+        }
+      });
+    });
+  } catch(e) { list.innerHTML = '<div class="empty"><div class="empty-t">搜尋失敗: ' + escapeHtml(e.message) + '</div></div>'; }
+}
+
+//============== K歌錄音 ==============
+let _mediaRec = null, _recChunks = [];
+function initRecorder() {
+  const btn = $('#rec-btn'); if (!btn) return;
+  const status = () => $('#rec-status');
+  const audio = $('#rec-audio');
+  const dl = $('#rec-dl');
+  const start = async () => {
+    if (_mediaRec && _mediaRec.state === 'recording') return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _mediaRec = new MediaRecorder(stream);
+      _recChunks = [];
+      _mediaRec.ondataavailable = e => _recChunks.push(e.data);
+      _mediaRec.onstop = () => {
+        const blob = new Blob(_recChunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        audio.src = url; audio.style.display = 'block';
+        dl.href = url; dl.download = `karaoke_${Date.now()}.webm`; dl.style.display = 'inline';
+        status().textContent = '錄音完成,可試聽 / 下載';
+        stream.getTracks().forEach(t => t.stop());
+      };
+      _mediaRec.start();
+      btn.style.transform = 'scale(1.1)';
+      btn.style.boxShadow = '0 0 0 14px rgba(255,107,107,.3),0 12px 32px rgba(201,42,42,.6)';
+      status().textContent = '🔴 錄音中…放開停止';
+    } catch(e) { toast('無法存取麥克風: ' + e.message, 4000); }
+  };
+  const stop = () => {
+    if (_mediaRec && _mediaRec.state === 'recording') _mediaRec.stop();
+    btn.style.transform = ''; btn.style.boxShadow = '';
+  };
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', stop);
+  btn.addEventListener('mouseleave', stop);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); start(); }, { passive: false });
+  btn.addEventListener('touchend', e => { e.preventDefault(); stop(); }, { passive: false });
 }
 
 //============== Init ==============
