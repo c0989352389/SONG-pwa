@@ -15,12 +15,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F7F4EE; --bg2:#EDE9DF;
+  --bg:#EAF0E6; --bg2:#D8E2D2;
   --accent:#C84B31; --accent2:#D4A24C; --hot:#5C7A56;
-  --text:#3A2E26; --text2:#6B7B8C; --text3:rgba(58,46,38,.4);
-  --glass:#FFFDF9; --glass-br:rgba(58,46,38,.12); --glass-st:rgba(58,46,38,.22);
-  --paper:#F7F4EE; --paper2:#EDE9DF; --card:#FFFDF9;
-  --ink:#3A2E26; --ink2:#6B7B8C;
+  --text:#3A2E26; --text2:#6B7B6B; --text3:rgba(46,58,42,.4);
+  --glass:#F5F8F2; --glass-br:rgba(46,58,42,.12); --glass-st:rgba(46,58,42,.22);
+  --paper:#EAF0E6; --paper2:#D8E2D2; --card:#F5F8F2;
+  --ink:#2E3A2A; --ink2:#6B7B6B;
   --brick:#C84B31; --mustard:#D4A24C; --moss:#5C7A56;
   --r:14px; --nav-h:40px;
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
@@ -52,6 +52,34 @@ body.palette-blue{
   --accent:#3A5F7A; --brick:#3A5F7A;
   --accent2:#8FA8B8; --mustard:#8FA8B8;
   --glass:#F5F9FB; --glass-br:rgba(42,53,64,.13); --glass-st:rgba(42,53,64,.22);
+}
+/* ===== Dark palettes ===== */
+body.palette-ink{
+  --paper:#0E0E12; --paper2:#1A1A20; --card:#1A1A20;
+  --bg:#0E0E12; --bg2:#1A1A20;
+  --ink:#F7F4EE; --ink2:rgba(239,234,224,.6);
+  --text:#F7F4EE; --text2:rgba(239,234,224,.6); --text3:rgba(239,234,224,.32);
+  --accent:#C84B31; --brick:#C84B31;
+  --accent2:#D4A24C; --mustard:#D4A24C;
+  --glass:#1A1A20; --glass-br:rgba(239,234,224,.1); --glass-st:rgba(239,234,224,.18);
+}
+body.palette-midnight{
+  --paper:#0F1729; --paper2:#1A2540; --card:#1A2540;
+  --bg:#0F1729; --bg2:#1A2540;
+  --ink:#E6EBF2; --ink2:rgba(230,235,242,.6);
+  --text:#E6EBF2; --text2:rgba(230,235,242,.6); --text3:rgba(230,235,242,.32);
+  --accent:#D4A24C; --brick:#D4A24C;
+  --accent2:#7FA8BF; --mustard:#7FA8BF;
+  --glass:#1A2540; --glass-br:rgba(230,235,242,.1); --glass-st:rgba(230,235,242,.18);
+}
+body.palette-mocha{
+  --paper:#1F1612; --paper2:#2C1F18; --card:#2C1F18;
+  --bg:#1F1612; --bg2:#2C1F18;
+  --ink:#EFEAE0; --ink2:rgba(239,234,224,.6);
+  --text:#EFEAE0; --text2:rgba(239,234,224,.6); --text3:rgba(239,234,224,.32);
+  --accent:#D4A24C; --brick:#D4A24C;
+  --accent2:#E8A87C; --mustard:#E8A87C;
+  --glass:#2C1F18; --glass-br:rgba(239,234,224,.1); --glass-st:rgba(239,234,224,.18);
 }
 /* Palette picker (in settings modal) */
 .palette-picker{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
@@ -507,24 +535,50 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
   100% {top:110%;transform:rotate(360deg) translateX(0);opacity:0}
 }
 
-/* --- B2 浮光上升 --- */
-#lyric-bg-fx .lyr-glow{position:absolute;bottom:-40px;border-radius:50%;background:radial-gradient(circle,rgba(212,162,76,.55) 0%,rgba(212,162,76,.15) 50%,transparent 75%);filter:blur(2px);opacity:0;animation:lyr-rise linear infinite}
-@keyframes lyr-rise{
-  0%   {bottom:-40px;transform:translateX(0);opacity:0}
-  15%  {opacity:.8}
-  50%  {transform:translateX(22px)}
-  85%  {opacity:.8}
-  100% {bottom:110%;transform:translateX(-15px);opacity:0}
-}
-
-/* --- B3 微塵漂浮 (淺色版,跟整體米白風和諧) --- */
-#lyric-bg-fx .lyr-mote{position:absolute;border-radius:50%;background:rgba(58,46,38,.35);box-shadow:0 0 3px rgba(58,46,38,.15);animation:lyr-drift 22s ease-in-out infinite}
+/* --- 微塵漂浮 (深色用,白點漂移) --- */
+#lyric-bg-fx .lyr-mote{position:absolute;border-radius:50%;background:rgba(239,234,224,.55);box-shadow:0 0 4px rgba(239,234,224,.3);animation:lyr-drift 22s ease-in-out infinite}
 @keyframes lyr-drift{
   0%,100% {transform:translate(0,0);opacity:.5}
   25%     {transform:translate(30px,-25px);opacity:.7}
   50%     {transform:translate(-20px,-50px);opacity:.4}
   75%     {transform:translate(25px,-30px);opacity:.6}
 }
+
+/* --- 雨絲 (淺色用) --- */
+#lyric-bg-fx .lyr-rain{position:absolute;top:-40px;width:1.5px;height:30px;background:linear-gradient(180deg,transparent,rgba(86,107,90,.55));border-radius:1px;animation:lyr-rain linear infinite}
+@keyframes lyr-rain{0%{top:-40px;opacity:0}10%{opacity:.65}90%{opacity:.55}100%{top:110%;opacity:0}}
+
+/* --- 櫻花 (淺色用) --- */
+#lyric-bg-fx .lyr-sakura{position:absolute;top:-30px;opacity:0;animation:lyr-sakura linear infinite}
+#lyric-bg-fx .lyr-sakura svg{width:100%;height:100%;display:block;filter:drop-shadow(0 1px 1px rgba(46,58,42,.06))}
+@keyframes lyr-sakura{
+  0%   {top:-30px;transform:translateX(0) rotate(0deg);opacity:0}
+  8%   {opacity:.8}
+  20%  {transform:translateX(-50px) rotate(-40deg)}
+  35%  {transform:translateX(55px)  rotate(30deg)}
+  50%  {transform:translateX(-65px) rotate(-60deg)}
+  65%  {transform:translateX(70px)  rotate(50deg)}
+  80%  {transform:translateX(-45px) rotate(-80deg)}
+  92%  {opacity:.7}
+  100% {top:110%;transform:translateX(35px) rotate(-120deg);opacity:0}
+}
+
+/* --- 漣漪音波 Sonar (深色用) --- */
+#lyric-bg-fx .lyr-sonar-core{position:absolute;top:50%;left:50%;width:10px;height:10px;background:radial-gradient(circle,#FFE082 0%,#D4A24C 50%,transparent 75%);border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 12px rgba(255,224,130,.7),0 0 28px rgba(212,162,76,.4);animation:lyr-sonar-core 2.4s ease-in-out infinite}
+@keyframes lyr-sonar-core{0%,100%{opacity:.6;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.3)}}
+#lyric-bg-fx .lyr-sonar{position:absolute;top:50%;left:50%;width:0;height:0;border:2px solid rgba(212,162,76,.7);border-radius:50%;transform:translate(-50%,-50%);opacity:0;animation:lyr-sonar-pulse 4.5s ease-out infinite}
+@keyframes lyr-sonar-pulse{0%{width:0;height:0;opacity:0;border-width:2.5px}8%{opacity:.9}100%{width:600px;height:600px;opacity:0;border-width:.4px}}
+#lyric-bg-fx .lyr-sonar-mini{position:absolute;width:0;height:0;border:1.5px solid rgba(212,162,76,.5);border-radius:50%;opacity:0;animation:lyr-sonar-mini 5.5s ease-out infinite}
+@keyframes lyr-sonar-mini{0%{width:0;height:0;opacity:0;transform:translate(-50%,-50%);border-width:1.5px}10%{opacity:.8}100%{width:280px;height:280px;opacity:0;transform:translate(-50%,-50%);border-width:.4px}}
+
+/* --- 極光 Aurora (深色用) --- */
+#lyric-bg-fx .lyr-aurora{position:absolute;top:-15%;height:130%;filter:blur(18px);mix-blend-mode:screen;border-radius:50% 50% 50% 50%/30% 30% 70% 70%;will-change:transform,opacity}
+@keyframes lyr-aurora-a{0%,100%{transform:translateX(0) scaleY(1) skewX(0deg);opacity:.85}25%{transform:translateX(15px) scaleY(1.12) skewX(-5deg);opacity:1}50%{transform:translateX(-12px) scaleY(.88) skewX(4deg);opacity:.65}75%{transform:translateX(20px) scaleY(1.06) skewX(-3deg);opacity:.95}}
+@keyframes lyr-aurora-b{0%,100%{transform:translateX(0) scaleY(1) skewX(0deg);opacity:.75}33%{transform:translateX(-22px) scaleY(1.15) skewX(6deg);opacity:1}66%{transform:translateX(14px) scaleY(.92) skewX(-4deg);opacity:.55}}
+@keyframes lyr-aurora-c{0%,100%{transform:translateX(0) scaleY(1) skewX(0deg);opacity:.8}40%{transform:translateX(24px) scaleY(1.14) skewX(-7deg);opacity:1}70%{transform:translateX(-18px) scaleY(.88) skewX(5deg);opacity:.6}}
+@keyframes lyr-aurora-d{0%,100%{transform:translateX(0) scaleY(1) skewX(0deg);opacity:.7}30%{transform:translateX(-14px) scaleY(1.1) skewX(4deg);opacity:.95}60%{transform:translateX(22px) scaleY(.94) skewX(-6deg);opacity:.5}}
+#lyric-bg-fx .lyr-star{position:absolute;width:2px;height:2px;background:rgba(247,244,238,.8);border-radius:50%;box-shadow:0 0 3px rgba(247,244,238,.6);animation:lyr-twinkle 3s ease-in-out infinite}
+@keyframes lyr-twinkle{0%,100%{opacity:.4}50%{opacity:1}}
 </style>
 </head>
 <body>
@@ -698,8 +752,8 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
         <label>底色 ／ Palette</label>
         <div class="palette-picker" id="palette-picker">
           <button type="button" data-palette="default" class="palette-opt">
-            <span class="pp-dot" style="background:linear-gradient(135deg,#F7F4EE 50%,#C84B31 50%)"></span>
-            米白 <span class="pp-sub">Original</span>
+            <span class="pp-dot" style="background:linear-gradient(135deg,#EAF0E6 50%,#C84B31 50%)"></span>
+            淺綠 <span class="pp-sub">Sage</span>
           </button>
           <button type="button" data-palette="cream" class="palette-opt">
             <span class="pp-dot" style="background:linear-gradient(135deg,#FAF3E0 50%,#B85540 50%)"></span>
@@ -712,6 +766,18 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
           <button type="button" data-palette="blue" class="palette-opt">
             <span class="pp-dot" style="background:linear-gradient(135deg,#ECEFF1 50%,#3A5F7A 50%)"></span>
             淡藍 <span class="pp-sub">Blue</span>
+          </button>
+          <button type="button" data-palette="ink" class="palette-opt">
+            <span class="pp-dot" style="background:linear-gradient(135deg,#0E0E12 50%,#C84B31 50%)"></span>
+            墨黑 <span class="pp-sub">Ink</span>
+          </button>
+          <button type="button" data-palette="midnight" class="palette-opt">
+            <span class="pp-dot" style="background:linear-gradient(135deg,#0F1729 50%,#D4A24C 50%)"></span>
+            午夜 <span class="pp-sub">Midnight</span>
+          </button>
+          <button type="button" data-palette="mocha" class="palette-opt">
+            <span class="pp-dot" style="background:linear-gradient(135deg,#1F1612 50%,#D4A24C 50%)"></span>
+            摩卡 <span class="pp-sub">Mocha</span>
           </button>
         </div>
       </div>
@@ -874,11 +940,17 @@ const LS = {
   songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode', shuffle:'song.shuffle', repeat:'song.repeat', langF:'song.langF', genderF:'song.genderF', baseVol:'song.baseVol'
 };
 const DEFAULT_SETTINGS = { ytKey:'', geminiKey:'', gasUrl:'', lang:'zh-TW', palette:'default' };
-const PALETTES = ['cream','blush','blue'];
+const PALETTES = ['cream','blush','blue','ink','midnight','mocha'];
+const DARK_PALETTES = ['ink','midnight','mocha'];
+function isDarkPalette(name){ return DARK_PALETTES.includes(name || 'default'); }
 function applyPalette(name){
   document.body.classList.remove(...PALETTES.map(p=>'palette-'+p));
   if (name && name !== 'default') document.body.classList.add('palette-' + name);
   State.settings.palette = name || 'default';
+  // 切 palette 時若在歌詞模式,根據新淺/深屬性重抽背景動畫
+  if (typeof State !== 'undefined' && State.viewMode === 'lyrics' && typeof buildLyricBg === 'function') {
+    buildLyricBg(pickLyricFx());
+  }
 }
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const THEMES = ['default','fire','ocean','forest','sunset','aurora','cyber','lava','galaxy','mint','rose','emerald','neon','blossom'];
@@ -3152,8 +3224,13 @@ async function voiceSearchAndPlay(q) {
 }
 
 //============== View mode ==============
-//============== 歌詞模式背景動畫 (3 套隨機輪流) ==============
-const LYRIC_FX = ['leaves','glow','dust'];
+//============== 歌詞模式背景動畫 (淺/深 各 3 套隨機輪流) ==============
+const LYRIC_FX_LIGHT = ['leaves','rain','sakura'];
+const LYRIC_FX_DARK  = ['dust','sonar','aurora'];
+function pickLyricFx() {
+  const set = isDarkPalette(State.settings.palette) ? LYRIC_FX_DARK : LYRIC_FX_LIGHT;
+  return set[Math.floor(Math.random() * set.length)];
+}
 function buildLyricBg(kind) {
   const bg = document.getElementById('lyric-bg-fx');
   if (!bg) return;
@@ -3168,37 +3245,75 @@ function buildLyricBg(kind) {
       {l:36,s:13,d:10,   dur:17, c:'#A03A22'},
       {l:60,s:16,d:5,    dur:14, c:'#D4A24C'},
     ];
-    html = data.map(x => `<div class="lyr-leaf" style="left:${x.l}%;width:${x.s}px;height:${x.s}px;animation-delay:${x.d}s;animation-duration:${x.dur}s"><svg viewBox="0 0 20 20"><path d="M10 2 C 15 5, 16 14, 10 18 C 4 14, 5 5, 10 2 Z" fill="${x.c}"/><line x1="10" y1="2" x2="10" y2="18" stroke="rgba(58,46,38,.3)" stroke-width=".7"/></svg></div>`).join('');
-  } else if (kind === 'glow') {
+    html = data.map(x => `<div class="lyr-leaf" style="left:${x.l}%;width:${x.s}px;height:${x.s}px;animation-delay:${x.d}s;animation-duration:${x.dur}s"><svg viewBox="0 0 20 20"><path d="M10 2 C 15 5, 16 14, 10 18 C 4 14, 5 5, 10 2 Z" fill="${x.c}"/><line x1="10" y1="2" x2="10" y2="18" stroke="rgba(46,58,42,.3)" stroke-width=".7"/></svg></div>`).join('');
+  } else if (kind === 'rain') {
     const data = [
-      {l:8, s:30,d:0, dur:14},
-      {l:24,s:24,d:4, dur:16},
-      {l:42,s:38,d:8, dur:18},
-      {l:62,s:30,d:2, dur:15},
-      {l:78,s:20,d:6, dur:16},
-      {l:92,s:28,d:11,dur:17},
-      {l:32,s:22,d:13,dur:15},
+      {l:8, d:0,   dur:1.4, o:1},
+      {l:18,d:0.3, dur:1.2, o:1},
+      {l:28,d:0.7, dur:1.5, o:1},
+      {l:38,d:0.1, dur:1.3, o:1},
+      {l:48,d:0.5, dur:1.6, o:1},
+      {l:58,d:0.9, dur:1.2, o:1},
+      {l:68,d:0.2, dur:1.4, o:1},
+      {l:78,d:0.6, dur:1.3, o:1},
+      {l:88,d:1.1, dur:1.5, o:1},
+      {l:14,d:0.8, dur:1.7, o:0.6},
+      {l:54,d:1.3, dur:1.4, o:0.7},
+      {l:74,d:1.0, dur:1.5, o:0.5},
     ];
-    html = data.map(x => `<div class="lyr-glow" style="left:${x.l}%;width:${x.s}px;height:${x.s}px;animation-delay:${x.d}s;animation-duration:${x.dur}s"></div>`).join('');
-  } else { // dust
+    html = data.map(x => `<div class="lyr-rain" style="left:${x.l}%;animation-delay:${x.d}s;animation-duration:${x.dur}s;opacity:${x.o}"></div>`).join('');
+  } else if (kind === 'sakura') {
     const data = [
-      {l:15,t:30,d:0, s:3},
-      {l:25,t:60,d:3, s:2},
-      {l:40,t:20,d:7, s:4},
-      {l:55,t:75,d:11,s:3},
-      {l:70,t:45,d:5, s:2},
-      {l:85,t:25,d:9, s:3.5},
-      {l:35,t:50,d:13,s:2},
-      {l:60,t:15,d:15,s:3},
-      {l:78,t:65,d:17,s:2.5},
-      {l:20,t:80,d:19,s:3},
+      {l:6, s:18,h:20,d:0,   dur:18},
+      {l:16,s:14,h:16,d:2.5, dur:21},
+      {l:28,s:20,h:22,d:5,   dur:17},
+      {l:40,s:15,h:17,d:7.5, dur:20},
+      {l:52,s:17,h:19,d:3,   dur:19},
+      {l:64,s:14,h:16,d:10,  dur:22},
+      {l:76,s:18,h:20,d:6,   dur:18},
+      {l:86,s:13,h:15,d:12,  dur:21},
+      {l:22,s:13,h:15,d:14,  dur:19},
+      {l:48,s:16,h:18,d:16,  dur:20},
+      {l:72,s:14,h:16,d:9,   dur:18},
+      {l:34,s:15,h:17,d:13,  dur:22},
     ];
-    html = data.map(x => `<div class="lyr-mote" style="left:${x.l}%;top:${x.t}%;width:${x.s}px;height:${x.s}px;animation-delay:${x.d}s"></div>`).join('');
+    const svg = '<svg viewBox="0 0 24 28"><path d="M 12 27 C 5 24 1 17 2 10 C 2 5 5 3 8 4 C 10 5 11 7 12 11 C 13 7 14 5 16 4 C 19 3 22 5 22 10 C 23 17 19 24 12 27 Z" fill="#FFB7C5" stroke="#E89AB5" stroke-width=".55"/><line x1="12" y1="27" x2="12" y2="11" stroke="#D67898" stroke-width=".5" opacity=".55"/><line x1="12" y1="22" x2="6.5" y2="15" stroke="#D67898" stroke-width=".3" opacity=".4"/><line x1="12" y1="22" x2="17.5" y2="15" stroke="#D67898" stroke-width=".3" opacity=".4"/></svg>';
+    html = data.map(x => `<div class="lyr-sakura" style="left:${x.l}%;width:${x.s}px;height:${x.h}px;animation-delay:${x.d}s;animation-duration:${x.dur}s">${svg}</div>`).join('');
+  } else if (kind === 'dust') {
+    const data = [
+      {l:15,t:30,d:0, s:3,  o:1},
+      {l:25,t:60,d:3, s:2,  o:0.7},
+      {l:40,t:20,d:7, s:4,  o:1},
+      {l:55,t:75,d:11,s:3,  o:1},
+      {l:70,t:45,d:5, s:2,  o:0.6},
+      {l:85,t:25,d:9, s:3.5,o:1},
+      {l:35,t:50,d:13,s:2,  o:1},
+      {l:60,t:15,d:15,s:3,  o:0.8},
+      {l:78,t:65,d:17,s:2.5,o:1},
+      {l:20,t:80,d:19,s:3,  o:1},
+    ];
+    html = data.map(x => `<div class="lyr-mote" style="left:${x.l}%;top:${x.t}%;width:${x.s}px;height:${x.s}px;animation-delay:${x.d}s;opacity:${x.o}"></div>`).join('');
+  } else if (kind === 'sonar') {
+    html = '<div class="lyr-sonar-core"></div>' +
+           '<div class="lyr-sonar" style="animation-delay:0s"></div>' +
+           '<div class="lyr-sonar" style="animation-delay:1.5s"></div>' +
+           '<div class="lyr-sonar" style="animation-delay:3s"></div>' +
+           '<div class="lyr-sonar-mini" style="top:25%;left:75%;animation-delay:0.8s"></div>' +
+           '<div class="lyr-sonar-mini" style="top:75%;left:20%;animation-delay:2.8s"></div>';
+  } else if (kind === 'aurora') {
+    html =
+      '<div class="lyr-aurora" style="left:-5%;width:35%;background:linear-gradient(180deg,transparent 0%,rgba(120,210,170,.85) 30%,rgba(120,210,170,.4) 65%,transparent 100%);animation:lyr-aurora-a 8s ease-in-out infinite"></div>' +
+      '<div class="lyr-aurora" style="left:18%;width:30%;background:linear-gradient(180deg,transparent 0%,rgba(180,150,255,.75) 32%,rgba(180,150,255,.35) 68%,transparent 100%);animation:lyr-aurora-b 10s ease-in-out infinite;animation-delay:-2.5s"></div>' +
+      '<div class="lyr-aurora" style="left:42%;width:32%;background:linear-gradient(180deg,transparent 0%,rgba(140,220,200,.8) 28%,rgba(140,220,200,.4) 64%,transparent 100%);animation:lyr-aurora-c 9s ease-in-out infinite;animation-delay:-5s"></div>' +
+      '<div class="lyr-aurora" style="left:66%;width:35%;background:linear-gradient(180deg,transparent 0%,rgba(130,170,255,.72) 32%,rgba(130,170,255,.32) 68%,transparent 100%);animation:lyr-aurora-d 11s ease-in-out infinite;animation-delay:-7s"></div>' +
+      '<div class="lyr-star" style="left:15%;top:75%;animation-delay:0s"></div>' +
+      '<div class="lyr-star" style="left:30%;top:85%;animation-delay:.7s"></div>' +
+      '<div class="lyr-star" style="left:55%;top:70%;animation-delay:1.2s"></div>' +
+      '<div class="lyr-star" style="left:75%;top:80%;animation-delay:.4s"></div>' +
+      '<div class="lyr-star" style="left:88%;top:90%;animation-delay:1.8s"></div>' +
+      '<div class="lyr-star" style="left:42%;top:88%;animation-delay:2.3s"></div>';
   }
   bg.innerHTML = html;
-}
-function pickLyricFx() {
-  return LYRIC_FX[Math.floor(Math.random() * LYRIC_FX.length)];
 }
 
 function switchMode(m) {
