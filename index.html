@@ -1572,18 +1572,10 @@ function playSong(id) {
     } catch(e) { console.warn('playSong load fail', e); }
     setTimeout(() => { try { State.player.setPlaybackRate(State.speed); } catch(_){} }, 800);
   } else {
-    // YT API 載入失敗 → 後備:在新分頁開 YouTube
-    if (window._ytLoadFailed) {
-      window.open(`https://www.youtube.com/watch?v=${s.videoId}`, '_blank');
-      toast('YT API 被擋(可能是追蹤防護),已在 YouTube 開啟',4000);
-      return;
-    }
     playSong._retry = (playSong._retry || 0) + 1;
-    if (playSong._retry > 8) {
+    if (playSong._retry > 12) {
       playSong._retry = 0;
-      window._ytLoadFailed = true;
-      window.open(`https://www.youtube.com/watch?v=${s.videoId}`, '_blank');
-      toast('YT 播放器無法在此瀏覽器載入,已改用 YouTube 開啟',4000);
+      toast('播放器載入失敗,瀏覽器可能擋了 YouTube。請關閉追蹤防護或換 Chrome 試試',6000);
       return;
     }
     setTimeout(()=>playSong(id), 500); return;
