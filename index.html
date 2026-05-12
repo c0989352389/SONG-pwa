@@ -3333,9 +3333,9 @@ function bind() {
   $('#btn-lrc-fwd')?.addEventListener('click', () => shiftLrc(0.5));
   $('#btn-lrc-anchor')?.addEventListener('click', anchorFirstLyric);
   $('#btn-lrc-reset')?.addEventListener('click', resetLrcOffset);
-  $('#btn-lrc-calib').addEventListener('click', toggleCalib);
-  $('#btn-lrc-wrong').addEventListener('click', reportLyricsWrong);
-  $('#btn-wrong-submit').addEventListener('click', submitWrong);
+  $('#btn-lrc-calib')?.addEventListener('click', toggleCalib);
+  $('#btn-lrc-wrong')?.addEventListener('click', reportLyricsWrong);
+  $('#btn-wrong-submit')?.addEventListener('click', submitWrong);
   // 點播放頁標題打開歌曲選單(整合原本的加入歌單/編輯/刪除)
   $('#np-title-wrap')?.addEventListener('click', () => {
     if (!State.currentId) { toast('先選一首歌'); return; }
