@@ -973,7 +973,7 @@ const State = {
   speed: 1, currentTheme: 'default',
   dragging: false,
   shuffleOn: false,
-  repeatMode: 0, // 0=off 1=one 2=playlist
+  repeatMode: 2, // 0=off 1=one 2=playlist (預設歌單循環)
   langFilter: 'all', // all|國語|台語|英語|日語|韓語|其他
   genderFilter: 'all', // all|男|女|團體|其他
 };
@@ -3797,7 +3797,13 @@ async function init() {
   // 手勢已取消
   switchMode(localStorage.getItem(LS.viewMode) || 'vinyl');
   State.shuffleOn = localStorage.getItem(LS.shuffle) === '1';
-  State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 0));
+  // Migration: 把舊「不循環」預設改為「歌單循環」(只跑一次)
+  if (!localStorage.getItem('repeat-default-v2')) {
+    const _r = localStorage.getItem(LS.repeat);
+    if (_r === null || _r === '0') localStorage.setItem(LS.repeat, '2');
+    localStorage.setItem('repeat-default-v2', '1');
+  }
+  State.repeatMode = Math.min(2, Math.max(0, +localStorage.getItem(LS.repeat) || 2));
   State.baseVolume = Math.min(100, Math.max(0, +localStorage.getItem(LS.baseVol) || DEFAULT_BASE_VOL));
   updatePlayModeUI();
   if (State.settings.gasUrl) await syncFromGAS();
