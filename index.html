@@ -1664,6 +1664,18 @@ function onPlayerState(e) {
     $('#np-art').classList.remove('playing'); document.body.classList.remove('playing'); stopProgress();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     stopThemeCycle();
+    // 非使用者主動暫停(YT 因 buffer/load 自動暫停) → 自動續播
+    if (!State.userPaused) {
+      clearTimeout(State._autoResume);
+      State._autoResume = setTimeout(() => {
+        if (!State.isPlaying && !State.userPaused && State.player && State.player.playVideo) {
+          try { State.player.playVideo(); } catch(_){}
+        }
+      }, 800);
+    }
+  } else if (s === YT.PlayerState.BUFFERING) {
+    // 緩衝中也記住非使用者暫停
+    if (!State.userPaused) clearTimeout(State._autoResume);
   } else if (s === YT.PlayerState.ENDED) {
     State.isPlaying = false; $('#btn-play').innerHTML = '<svg viewBox="0 0 24 24" width="34" height="34"><polygon points="7,4 21,12 7,20" fill="currentColor"/></svg>'; stopProgress();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
@@ -1779,10 +1791,14 @@ function openVolModal() {
 
 function togglePlay() {
   if (!State.songs.length) { toast('歌單是空的'); return; }
-  if (!State.currentId) { playSong(State.songs[0].id); return; }
+  if (!State.currentId) { State.userPaused = false; playSong(State.songs[0].id); return; }
   if (!State.player || !State.player.playVideo) { toast('播放器未就緒'); return; }
-  if (State.isPlaying) { try { State.player.pauseVideo(); } catch(_){} return; }
-  // 還沒實際載入過 → 重新走 playSong
+  if (State.isPlaying) {
+    State.userPaused = true; // 標記為使用者主動暫停
+    try { State.player.pauseVideo(); } catch(_){}
+    return;
+  }
+  State.userPaused = false;
   let dur = 0;
   try { dur = State.player.getDuration ? (State.player.getDuration() || 0) : 0; } catch(_){}
   if (dur < 1) { playSong(State.currentId); return; }
