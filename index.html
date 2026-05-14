@@ -2453,9 +2453,13 @@ function renderLibrary(filter='') {
     if (!q) return true;
     return [s.title, s.artist, s.tag].filter(Boolean).join(' ').toLowerCase().includes(q);
   });
+  // 進入歌手分類時加「找更多此歌手歌曲」按鈕
+  const curPl = State.currentPlaylistId !== 'all' ? State.playlists.find(p => p.id === State.currentPlaylistId) : null;
+  const searchMoreHtml = curPl ? `<button class="btn pri sm" id="btn-search-more" style="width:100%;margin-bottom:10px;padding:10px">🔍 搜尋「${escapeHtml(curPl.name)}」更多歌曲</button>` : '';
   if (!all.length) {
     const isEmptyLib = !State.songs.length;
-    list.innerHTML = `<div class="empty">${isEmptyLib ? EMPTY_ART_SVG : '<div class="empty-i">♫</div>'}<div class="empty-t">${isEmptyLib ? '歌單是空的,到「加歌」開始' : '沒有符合的歌曲'}</div></div>`;
+    list.innerHTML = searchMoreHtml + `<div class="empty">${isEmptyLib ? EMPTY_ART_SVG : '<div class="empty-i">♫</div>'}<div class="empty-t">${isEmptyLib ? '歌單是空的,到「加歌」開始' : '沒有符合的歌曲'}</div></div>`;
+    _bindSearchMoreBtn();
     return;
   }
   const totalPages = Math.max(1, Math.ceil(all.length / LIB_PAGE_SIZE));
@@ -2474,7 +2478,7 @@ function renderLibrary(filter='') {
     </div>` : '';
   if (isGrid) {
     // ===== Grid 模式: 封面卡片 =====
-    list.innerHTML = '<div class="song-grid">' + items.map(s => `
+    list.innerHTML = searchMoreHtml + '<div class="song-grid">' + items.map(s => `
       <div class="song-card ${s.id === State.currentId ? 'playing' : ''}" data-id="${s.id}">
         <div class="song-card-art" data-act="play" title="點圖播放">
           <img src="${s.thumb || ''}" alt="" loading="lazy" onerror="this.style.opacity='.2'">
@@ -2500,10 +2504,11 @@ function renderLibrary(filter='') {
     const prev = $('#lib-prev'), next = $('#lib-next');
     if (prev) prev.addEventListener('click', ()=>{State.libPage--; renderLibrary();});
     if (next) next.addEventListener('click', ()=>{State.libPage++; renderLibrary();});
+    _bindSearchMoreBtn();
     return;
   }
   // ===== List 模式: 原本的 .song-row =====
-  list.innerHTML = items.map(s => `
+  list.innerHTML = searchMoreHtml + items.map(s => `
     <div class="song-row ${s.id === State.currentId ? 'playing' : ''}" data-id="${s.id}" draggable="true">
       ${sortable ? '<span class="drag-h" title="按住拖曳排序">⋮⋮</span>' : ''}
       <img src="${s.thumb || ''}" alt="" loading="lazy" onerror="this.style.opacity='.2'" data-act="play" title="點圖播放" style="cursor:pointer">
@@ -2553,6 +2558,22 @@ function renderLibrary(filter='') {
       onEnd: () => _persistOrderFromDom(),
     });
   }
+  _bindSearchMoreBtn();
+}
+function _bindSearchMoreBtn() {
+  const btn = document.getElementById('btn-search-more');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const pl = State.playlists.find(p => p.id === State.currentPlaylistId);
+    if (!pl) return;
+    switchPage('add');
+    // 切到搜尋 tab
+    $$('.search-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === 'search'));
+    $('#tab-recommend').style.display = 'none';
+    $('#tab-search').style.display = '';
+    $('#yt-q').value = pl.name;
+    $('#btn-yt-search').click();
+  });
 }
 function _persistOrderFromDom() {
   const pid = State.currentPlaylistId === 'all' ? '__all__' : State.currentPlaylistId;
