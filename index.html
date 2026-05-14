@@ -2581,6 +2581,7 @@ function openSongSheet(id) {
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn pri" data-sheet-act="play">▶ 播放</button>
       <button class="btn" data-sheet-act="edit">✏ 編輯名稱</button>
+      <button class="btn" data-sheet-act="ai-fix">🤖 AI 重新解析</button>
       <button class="btn" data-sheet-act="addtag">標籤</button>
       <button class="btn danger" data-sheet-act="del">刪除</button>
     </div>`;
@@ -2625,6 +2626,17 @@ function openSongSheet(id) {
     closeSheet(); playSong(s.id); switchPage('player');
   });
   $('#sheet-body').querySelector('[data-sheet-act="edit"]').addEventListener('click', () => { closeSheet(); openEditSong(s.id); });
+  $('#sheet-body').querySelector('[data-sheet-act="ai-fix"]').addEventListener('click', async () => {
+    toast('AI 解析中…');
+    const parsed = await _aiParseSong(s.title, s.artist);
+    if (!parsed) { toast('AI 無回應或額度用完'); return; }
+    s.title = parsed.title; if (parsed.artist) s.artist = parsed.artist;
+    delete s.searchTitle; delete s.searchArtist; s.lrc = ''; s._lrcTried = false;
+    saveSongsLocal(); pushSongToCloud(s); renderLibrary();
+    if (State.currentId === s.id) { setNpTitle(s.title); $('#np-artist').textContent = s.artist || ''; parseLyrics(''); autoFetchLrcSilent(s); }
+    closeSheet();
+    toast('✓ 已更新:' + s.title + ' / ' + (s.artist || '?'), 3500);
+  });
   $('#sheet-body').querySelector('[data-sheet-act="addtag"]').addEventListener('click', async () => {
     const t = prompt('標籤(空白以逗號分隔):', s.tag || '');
     if (t === null) return;
@@ -3000,8 +3012,38 @@ async function autoClassify(s, force) {
   }
 }
 
+// 用 AI 從 YT 標題+頻道解析出真實歌名/歌手
+async function _aiParseSong(rawTitle, rawChannel) {
+  if (!State.settings.geminiKey || _geminiCooldownLeft() > 0) return null;
+  const prompt = `從這個 YouTube 影片資訊判斷真實的歌曲名與歌手名。
+YouTube 標題: ${rawTitle}
+頻道: ${rawChannel || '(未知)'}
+
+注意:頻道可能是唱片公司、MV 上傳者(例如「索尼音樂」「Peculiar音樂」「VEVO」),不是真正歌手。
+標題常含【高音質】、(Official MV)、[HD]、《》等贅字,要去掉。
+
+僅回傳 JSON,格式: {"title":"歌名","artist":"歌手名"}
+若無法確定歌手就回 {"artist":""}。
+不要 markdown,只給純 JSON。`;
+  try {
+    const text = await gemini(prompt, { temp: 0.2, max: 150 });
+    const m = String(text).match(/\{[\s\S]*?\}/);
+    if (!m) return null;
+    const j = JSON.parse(m[0].replace(/[""]/g,'"'));
+    if (!j.title) return null;
+    return { title: String(j.title).trim(), artist: String(j.artist || '').trim() };
+  } catch(e){ console.warn('aiParseSong', e); return null; }
+}
+
 async function addSong(s, opts={}) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
+  // AI 解析真實歌名/歌手(若有 Gemini key 且不在冷卻)
+  if (!opts.skipAiParse) {
+    const parsed = await _aiParseSong(s.title, s.artist);
+    if (parsed) {
+      s = { ...s, title: parsed.title, artist: parsed.artist || s.artist };
+    }
+  }
   // 同歌手+同歌名才提示(可跳過)
   if (!opts.skipDupCheck) {
     const sims = _findSimilar(s.title, s.artist, null).filter(x => x.sameArtist);
