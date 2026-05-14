@@ -874,6 +874,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
       <div class="modal-foot">
         <button class="btn dim" id="btn-test-gas">🔌 測試 GAS</button>
         <button class="btn dim" id="btn-resync">⟳ 手動同步</button>
+        <button class="btn dim" id="btn-ai-cleanup">🤖 AI 整理所有歌曲</button>
         <button class="btn dim" data-close>取消</button>
         <button class="btn pri" id="btn-save-settings">儲存</button>
       </div>
@@ -1151,6 +1152,7 @@ function gasFromCloudSong(s) {
     orderInPl: tryParse(s['歌單內排序JSON']) || {},
     lang: s['語言'] || '',
     gender: s['性別'] || '',
+    album: s['專輯'] || '',
   };
 }
 async function syncFromGAS() {
@@ -1306,7 +1308,7 @@ function pushSongToCloud(s) {
     '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
     'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0,
     '歌單內排序JSON': JSON.stringify(s.orderInPl||{}),
-    '語言': s.lang || '', '性別': s.gender || ''
+    '語言': s.lang || '', '性別': s.gender || '', '專輯': s.album || ''
   }).catch(e => console.warn('push', e));
 }
 
@@ -2631,11 +2633,12 @@ function openSongSheet(id) {
     const parsed = await _aiParseSong(s.title, s.artist);
     if (!parsed) { toast('AI 無回應或額度用完'); return; }
     s.title = parsed.title; if (parsed.artist) s.artist = parsed.artist;
+    if (parsed.album) s.album = parsed.album;
     delete s.searchTitle; delete s.searchArtist; s.lrc = ''; s._lrcTried = false;
     saveSongsLocal(); pushSongToCloud(s); renderLibrary();
     if (State.currentId === s.id) { setNpTitle(s.title); $('#np-artist').textContent = s.artist || ''; parseLyrics(''); autoFetchLrcSilent(s); }
     closeSheet();
-    toast('✓ 已更新:' + s.title + ' / ' + (s.artist || '?'), 3500);
+    toast('✓ 已更新:' + s.title + ' / ' + (s.artist || '?') + (s.album ? ' / 《' + s.album + '》' : ''), 4000);
   });
   $('#sheet-body').querySelector('[data-sheet-act="addtag"]').addEventListener('click', async () => {
     const t = prompt('標籤(空白以逗號分隔):', s.tag || '');
@@ -3012,36 +3015,42 @@ async function autoClassify(s, force) {
   }
 }
 
-// 用 AI 從 YT 標題+頻道解析出真實歌名/歌手
+// 用 AI 從 YT 標題+頻道解析出真實歌名/歌手/專輯
 async function _aiParseSong(rawTitle, rawChannel) {
   if (!State.settings.geminiKey || _geminiCooldownLeft() > 0) return null;
-  const prompt = `從這個 YouTube 影片資訊判斷真實的歌曲名與歌手名。
+  const prompt = `從這個 YouTube 影片資訊判斷真實的歌曲名、歌手名、所屬專輯。
 YouTube 標題: ${rawTitle}
 頻道: ${rawChannel || '(未知)'}
 
-注意:頻道可能是唱片公司、MV 上傳者(例如「索尼音樂」「Peculiar音樂」「VEVO」),不是真正歌手。
-標題常含【高音質】、(Official MV)、[HD]、《》等贅字,要去掉。
+注意:
+- 頻道可能是唱片公司、MV 上傳者(例如「索尼音樂」「Peculiar音樂」「VEVO」),不是真正歌手
+- 標題常含【高音質】、(Official MV)、[HD]、《》、ft.、feat. 等贅字,清掉
+- 歌名要乾淨(不含歌手名/專輯名)
+- 專輯名若標題沒寫,根據你的知識補(查不到就留空)
 
-僅回傳 JSON,格式: {"title":"歌名","artist":"歌手名"}
-若無法確定歌手就回 {"artist":""}。
-不要 markdown,只給純 JSON。`;
+僅回傳 JSON,格式: {"title":"歌名","artist":"歌手名","album":"專輯名"}
+不確定的欄位留空字串。不要 markdown,只給純 JSON。`;
   try {
-    const text = await gemini(prompt, { temp: 0.2, max: 150 });
+    const text = await gemini(prompt, { temp: 0.2, max: 200 });
     const m = String(text).match(/\{[\s\S]*?\}/);
     if (!m) return null;
     const j = JSON.parse(m[0].replace(/[""]/g,'"'));
     if (!j.title) return null;
-    return { title: String(j.title).trim(), artist: String(j.artist || '').trim() };
+    return {
+      title: String(j.title).trim(),
+      artist: String(j.artist || '').trim(),
+      album: String(j.album || '').trim()
+    };
   } catch(e){ console.warn('aiParseSong', e); return null; }
 }
 
 async function addSong(s, opts={}) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
-  // AI 解析真實歌名/歌手(若有 Gemini key 且不在冷卻)
+  // AI 解析真實歌名/歌手/專輯(若有 Gemini key 且不在冷卻)
   if (!opts.skipAiParse) {
     const parsed = await _aiParseSong(s.title, s.artist);
     if (parsed) {
-      s = { ...s, title: parsed.title, artist: parsed.artist || s.artist };
+      s = { ...s, title: parsed.title, artist: parsed.artist || s.artist, album: parsed.album || '' };
     }
   }
   // 同歌手+同歌名才提示(可跳過)
@@ -3078,7 +3087,8 @@ async function addSong(s, opts={}) {
     thumb: s.thumb || `https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg`,
     dur:'', addedAt: new Date().toISOString(), tag: (s.artist || '').trim(), playCount:0, lastPlay:'',
     lrc:'', note:'', translations:{}, explanations:{}, sections:[],
-    playlistIds: targetPlId ? [targetPlId] : [], bpm: 0
+    playlistIds: targetPlId ? [targetPlId] : [], bpm: 0,
+    album: s.album || ''
   };
   State.songs.unshift(local); saveSongsLocal(); renderLibrary();
   toast('已加入「' + (State.playlists.find(p=>p.id===targetPlId)?.name || '') + '」');
@@ -3896,6 +3906,7 @@ function bind() {
   });
   $('#btn-resync').addEventListener('click', syncFromGAS);
   $('#btn-test-gas').addEventListener('click', testGasConnection);
+  $('#btn-ai-cleanup').addEventListener('click', batchAiCleanup);
   $('#btn-cloud-sync').addEventListener('click', () => {
     if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
     syncFromGAS();
@@ -3946,6 +3957,34 @@ function bind() {
   $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('show')));
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheet));
+}
+
+//============== 批次 AI 整理所有歌曲 ==============
+async function batchAiCleanup() {
+  if (!State.settings.geminiKey) { toast('需要 Gemini API Key'); return; }
+  const list = State.songs.slice();
+  if (!list.length) { toast('歌單是空的'); return; }
+  if (!confirm(`將用 AI 重新解析 ${list.length} 首歌的歌名/歌手/專輯,可能耗時數分鐘且消耗 API 額度。確定?`)) return;
+  let ok = 0, fail = 0;
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i];
+    toast(`AI 整理中… ${i+1}/${list.length}: ${s.title.slice(0,20)}`, 2000);
+    if (_geminiCooldownLeft() > 0) { toast('AI 額度用完,中斷整理'); break; }
+    const parsed = await _aiParseSong(s.title, s.artist);
+    if (parsed) {
+      s.title = parsed.title;
+      if (parsed.artist) s.artist = parsed.artist;
+      if (parsed.album) s.album = parsed.album;
+      // 改名後清舊歌詞讓下次自動重抓
+      delete s.searchTitle; delete s.searchArtist; s.lrc = ''; s._lrcTried = false;
+      saveSongsLocal();
+      pushSongToCloud(s);
+      ok++;
+    } else fail++;
+    await new Promise(r => setTimeout(r, 1200)); // 限速避免 quota
+  }
+  renderLibrary();
+  toast(`✓ 整理完成:成功 ${ok} 首,失敗 ${fail} 首`, 5000);
 }
 
 //============== Init ==============
