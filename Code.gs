@@ -9,10 +9,10 @@
 const SHEET_ID = '1THqrOQNwSGeYrlVvx9j928iEwptESlH-pvdyMxMfLMU';
 
 const SONGS_SHEET = '歌單';
-const SONGS_HEADER = ['ID','歌名','歌手','YouTubeID','縮圖','時長','加入時間','標籤','播放次數','最後播放','歌詞LRC','備註','翻譯JSON','解釋JSON','段落JSON','歌單IDs','BPM','歌詞偏移','歌單內排序JSON','語言','性別','專輯'];
+const SONGS_HEADER = ['ID','歌名','歌手','YouTubeID','縮圖','時長','加入時間','標籤','播放次數','最後播放','歌詞LRC','備註','翻譯JSON','解釋JSON','段落JSON','歌單IDs','BPM','歌詞偏移','歌單內排序JSON','語言','性別','專輯','更新時間'];
 
 const PL_SHEET = '歌單分組';
-const PL_HEADER = ['ID','名稱','排序','顏色'];
+const PL_HEADER = ['ID','名稱','排序','顏色','更新時間'];
 
 const SETTINGS_SHEET = '設定';
 const SETTINGS_HEADER = ['key','value'];
@@ -174,8 +174,8 @@ function upsertSong(body) {
 
   let row = id ? _findRowById_(sh, id) : -1;
 
+  const nowIso = new Date().toISOString();
   if (!id || row < 0) {
-    // 新增列 (用 client 提供的 ID 或自動產生的)
     if (!id) id = _newId_();
     const obj = {};
     SONGS_HEADER.forEach(k => obj[k] = body[k] !== undefined ? body[k] : '');
@@ -183,15 +183,33 @@ function upsertSong(body) {
     if (!obj['加入時間']) obj['加入時間'] = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss');
     if (!obj['縮圖'] && obj['YouTubeID']) obj['縮圖'] = 'https://i.ytimg.com/vi/' + obj['YouTubeID'] + '/mqdefault.jpg';
     if (obj['播放次數'] === '') obj['播放次數'] = 0;
+    obj['更新時間'] = body['更新時間'] || nowIso;
     sh.appendRow(header.map(h => obj[h] !== undefined ? obj[h] : ''));
     return { ok:true, id, created:true };
   }
 
-  // 更新既有列
+  // 版本檢查:若雲端版本比本次推送新 → 拒絕(但仍接受播放次數/最後播放等統計類更新)
+  if (idx['更新時間'] !== undefined) {
+    const cloudT = sh.getRange(row, idx['更新時間'] + 1).getValue();
+    const incomingT = body['更新時間'];
+    if (cloudT && incomingT && String(cloudT) > String(incomingT)) {
+      // 只允許特定統計欄位更新(播放次數/最後播放)
+      const allowed = ['播放次數','最後播放'];
+      Object.keys(body).forEach(k => {
+        if (allowed.includes(k) && idx[k] !== undefined) sh.getRange(row, idx[k] + 1).setValue(body[k]);
+      });
+      return { ok:true, id, rejected:true, reason:'older version' };
+    }
+  }
+
   Object.keys(body).forEach(k => {
     if (k === 'action' || k === 'callback') return;
     if (idx[k] !== undefined) sh.getRange(row, idx[k] + 1).setValue(body[k]);
   });
+  // 設定本次更新時間(若 body 沒帶就用 now)
+  if (idx['更新時間'] !== undefined && !body['更新時間']) {
+    sh.getRange(row, idx['更新時間'] + 1).setValue(nowIso);
+  }
   return { ok:true, id, updated:true };
 }
 
@@ -241,14 +259,29 @@ function upsertPlaylist(body) {
   let id = body['ID'];
   if (!id) id = _newId_('pl');
   const row = _findRowById_(sh, id);
+  const nowIso = new Date().toISOString();
   if (row < 0) {
-    sh.appendRow(header.map(h => (h === 'ID' ? id : (body[h] !== undefined ? body[h] : ''))));
+    const obj = {};
+    PL_HEADER.forEach(h => obj[h] = (h === 'ID' ? id : (body[h] !== undefined ? body[h] : '')));
+    obj['更新時間'] = body['更新時間'] || nowIso;
+    sh.appendRow(header.map(h => obj[h] !== undefined ? obj[h] : ''));
     return { ok:true, id, created:true };
+  }
+  // 版本檢查
+  if (idx['更新時間'] !== undefined) {
+    const cloudT = sh.getRange(row, idx['更新時間'] + 1).getValue();
+    const incomingT = body['更新時間'];
+    if (cloudT && incomingT && String(cloudT) > String(incomingT)) {
+      return { ok:true, id, rejected:true, reason:'older version' };
+    }
   }
   Object.keys(body).forEach(k => {
     if (k === 'action' || k === 'callback') return;
     if (idx[k] !== undefined) sh.getRange(row, idx[k] + 1).setValue(body[k]);
   });
+  if (idx['更新時間'] !== undefined && !body['更新時間']) {
+    sh.getRange(row, idx['更新時間'] + 1).setValue(nowIso);
+  }
   return { ok:true, id, updated:true };
 }
 

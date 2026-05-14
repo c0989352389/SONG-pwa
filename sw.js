@@ -1,4 +1,4 @@
-const CACHE = 'song-v6';
+const CACHE = 'song-v7';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon.svg'];
 
 self.addEventListener('install', e => {

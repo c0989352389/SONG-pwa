@@ -1154,6 +1154,7 @@ function gasFromCloudSong(s) {
     lang: s['語言'] || '',
     gender: s['性別'] || '',
     album: s['專輯'] || '',
+    updatedAt: s['更新時間'] || '',
   };
 }
 async function syncFromGAS() {
@@ -1218,12 +1219,8 @@ async function syncFromGAS() {
           else if (pr && !pr.ok) errors.push('push: ' + pr.error);
         } catch(e) { errors.push('push: ' + e.message); }
       }
-      // 把合併後豐富的欄位回推雲端(只有發生過合併才需要)
-      if (dupSongIds.length) {
-        for (const s of State.songs) {
-          if (byVid.get(s.videoId) === s) pushSongToCloud(s).catch(()=>{});
-        }
-      }
+      // 不再 auto-push merged 結果回雲端(避免把舊本機資料覆蓋雲端的修正)
+      // 若 dedup 有刪除重複列,雲端會剩單筆,該筆內容已是雲端最新(同步下來時即為準)
     }
 
     const p = await gas('getPlaylists');
@@ -1300,8 +1297,10 @@ async function testGasConnection() {
     else toast('GAS 回傳異常: ' + JSON.stringify(r).slice(0,80), 5000);
   } catch(e) { toast('連線失敗: ' + e.message, 5000); }
 }
-function pushSongToCloud(s) {
+function pushSongToCloud(s, opts={}) {
   if (!State.settings.gasUrl) return Promise.resolve();
+  // 標記為本機已修改 → 更新時間設為 now;否則沿用 s.updatedAt(雲端最後一次同步來的)
+  if (opts.bumpVersion !== false) s.updatedAt = new Date().toISOString();
   return gas('upsertSong', {
     'ID': s.id, '歌名': s.title, '歌手': s.artist, 'YouTubeID': s.videoId, '縮圖': s.thumb, '時長': s.dur,
     '標籤': s.tag, '備註': s.note, '歌詞LRC': s.lrc,
@@ -1309,7 +1308,8 @@ function pushSongToCloud(s) {
     '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
     'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0,
     '歌單內排序JSON': JSON.stringify(s.orderInPl||{}),
-    '語言': s.lang || '', '性別': s.gender || '', '專輯': s.album || ''
+    '語言': s.lang || '', '性別': s.gender || '', '專輯': s.album || '',
+    '更新時間': s.updatedAt || new Date().toISOString()
   }).catch(e => console.warn('push', e));
 }
 
