@@ -188,17 +188,21 @@ function upsertSong(body) {
     return { ok:true, id, created:true };
   }
 
-  // 版本檢查:若雲端版本比本次推送新 → 拒絕(但仍接受播放次數/最後播放等統計類更新)
+  // 版本檢查:嚴格 - 雲端已有 更新時間 但 incoming 沒帶 / 比雲端舊 → 拒絕
   if (idx['更新時間'] !== undefined) {
     const cloudT = sh.getRange(row, idx['更新時間'] + 1).getValue();
     const incomingT = body['更新時間'];
-    if (cloudT && incomingT && String(cloudT) > String(incomingT)) {
-      // 只允許特定統計欄位更新(播放次數/最後播放)
-      const allowed = ['播放次數','最後播放'];
-      Object.keys(body).forEach(k => {
-        if (allowed.includes(k) && idx[k] !== undefined) sh.getRange(row, idx[k] + 1).setValue(body[k]);
-      });
-      return { ok:true, id, rejected:true, reason:'older version' };
+    if (cloudT) {
+      // 沒帶 incoming timestamp → 一律當成舊版,只允許統計類更新
+      // 帶了但 < 雲端 → 拒絕(同上)
+      const newer = incomingT && String(incomingT) >= String(cloudT);
+      if (!newer) {
+        const allowed = ['播放次數','最後播放'];
+        Object.keys(body).forEach(k => {
+          if (allowed.includes(k) && idx[k] !== undefined) sh.getRange(row, idx[k] + 1).setValue(body[k]);
+        });
+        return { ok:true, id, rejected:true, reason: incomingT ? 'older version' : 'missing timestamp' };
+      }
     }
   }
 
@@ -206,7 +210,6 @@ function upsertSong(body) {
     if (k === 'action' || k === 'callback') return;
     if (idx[k] !== undefined) sh.getRange(row, idx[k] + 1).setValue(body[k]);
   });
-  // 設定本次更新時間(若 body 沒帶就用 now)
   if (idx['更新時間'] !== undefined && !body['更新時間']) {
     sh.getRange(row, idx['更新時間'] + 1).setValue(nowIso);
   }
@@ -267,12 +270,13 @@ function upsertPlaylist(body) {
     sh.appendRow(header.map(h => obj[h] !== undefined ? obj[h] : ''));
     return { ok:true, id, created:true };
   }
-  // 版本檢查
+  // 版本檢查(嚴格)
   if (idx['更新時間'] !== undefined) {
     const cloudT = sh.getRange(row, idx['更新時間'] + 1).getValue();
     const incomingT = body['更新時間'];
-    if (cloudT && incomingT && String(cloudT) > String(incomingT)) {
-      return { ok:true, id, rejected:true, reason:'older version' };
+    if (cloudT) {
+      const newer = incomingT && String(incomingT) >= String(cloudT);
+      if (!newer) return { ok:true, id, rejected:true, reason: incomingT ? 'older version' : 'missing timestamp' };
     }
   }
   Object.keys(body).forEach(k => {
