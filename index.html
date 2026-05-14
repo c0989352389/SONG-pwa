@@ -3959,32 +3959,45 @@ function bind() {
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheet));
 }
 
-//============== 批次 AI 整理所有歌曲 ==============
+//============== 批次 AI 整理所有歌曲 + 查核歌詞 ==============
 async function batchAiCleanup() {
   if (!State.settings.geminiKey) { toast('需要 Gemini API Key'); return; }
   const list = State.songs.slice();
   if (!list.length) { toast('歌單是空的'); return; }
-  if (!confirm(`將用 AI 重新解析 ${list.length} 首歌的歌名/歌手/專輯,可能耗時數分鐘且消耗 API 額度。確定?`)) return;
-  let ok = 0, fail = 0;
+  if (!confirm(`將用 AI 重新解析 ${list.length} 首歌的「歌名/歌手/專輯」並重新抓歌詞驗證。\n預估耗時 ${Math.ceil(list.length * 4 / 60)} 分鐘,消耗較多 API 額度。\n確定?`)) return;
+
+  let parsedOk = 0, lrcOk = 0, lrcMiss = 0, failed = 0;
   for (let i = 0; i < list.length; i++) {
     const s = list[i];
-    toast(`AI 整理中… ${i+1}/${list.length}: ${s.title.slice(0,20)}`, 2000);
-    if (_geminiCooldownLeft() > 0) { toast('AI 額度用完,中斷整理'); break; }
+    const tag = `${i+1}/${list.length}`;
+    if (_geminiCooldownLeft() > 0) { toast('AI 額度用完,中斷整理(處理到 ' + tag + ')',6000); break; }
+    toast(`🤖 解析中 ${tag}: ${(s.title||'').slice(0,18)}`, 2500);
+    // 1. AI 解析名稱/歌手/專輯
     const parsed = await _aiParseSong(s.title, s.artist);
+    let changed = false;
     if (parsed) {
-      s.title = parsed.title;
-      if (parsed.artist) s.artist = parsed.artist;
-      if (parsed.album) s.album = parsed.album;
-      // 改名後清舊歌詞讓下次自動重抓
+      if (parsed.title && parsed.title !== s.title) { s.title = parsed.title; changed = true; }
+      if (parsed.artist && parsed.artist !== s.artist) { s.artist = parsed.artist; changed = true; }
+      if (parsed.album && parsed.album !== s.album) { s.album = parsed.album; changed = true; }
+      parsedOk++;
+    } else { failed++; await new Promise(r => setTimeout(r, 1200)); continue; }
+
+    if (changed) {
+      // 改了名 → 清掉舊歌詞與覆寫,重抓
       delete s.searchTitle; delete s.searchArtist; s.lrc = ''; s._lrcTried = false;
-      saveSongsLocal();
-      pushSongToCloud(s);
-      ok++;
-    } else fail++;
-    await new Promise(r => setTimeout(r, 1200)); // 限速避免 quota
+    }
+    // 2. 抓/驗證歌詞
+    toast(`🎵 找歌詞 ${tag}: ${s.title.slice(0,18)}`, 2500);
+    try {
+      const r = await fetchLyricsAuto(s);
+      if (r && r.lrc) { s.lrc = r.lrc; lrcOk++; }
+      else lrcMiss++;
+    } catch(e) { lrcMiss++; }
+    saveSongsLocal(); pushSongToCloud(s);
+    await new Promise(r => setTimeout(r, 800));
   }
   renderLibrary();
-  toast(`✓ 整理完成:成功 ${ok} 首,失敗 ${fail} 首`, 5000);
+  toast(`✓ 整理完成 / 解析:${parsedOk} / 抓到歌詞:${lrcOk} / 未抓到:${lrcMiss} / AI失敗:${failed}`, 8000);
 }
 
 //============== Init ==============
