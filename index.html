@@ -2566,14 +2566,29 @@ function _bindSearchMoreBtn() {
   btn.addEventListener('click', () => {
     const pl = State.playlists.find(p => p.id === State.currentPlaylistId);
     if (!pl) return;
+    // 記住:這次搜尋加入的歌都歸進此歌單(免再選分類)
+    State._searchPinPl = pl.id;
     switchPage('add');
-    // 切到搜尋 tab
     $$('.search-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === 'search'));
     $('#tab-recommend').style.display = 'none';
     $('#tab-search').style.display = '';
     $('#yt-q').value = pl.name;
     $('#btn-yt-search').click();
+    // 顯示提示橫條
+    showPinnedPlBanner(pl);
   });
+}
+function showPinnedPlBanner(pl) {
+  let bar = document.getElementById('pin-banner');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'pin-banner';
+    bar.style.cssText = 'background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px';
+    $('#tab-search').insertBefore(bar, $('#tab-search').firstChild);
+  }
+  bar.innerHTML = `📌 找到的歌會自動加入「${escapeHtml(pl.name)}」 <button class="btn dim sm" id="pin-cancel" style="background:rgba(255,255,255,.2);color:#fff;border:none">取消</button>`;
+  bar.style.display = 'flex';
+  bar.querySelector('#pin-cancel').onclick = () => { State._searchPinPl = null; bar.style.display = 'none'; toast('已取消固定分類'); };
 }
 function _persistOrderFromDom() {
   const pid = State.currentPlaylistId === 'all' ? '__all__' : State.currentPlaylistId;
@@ -3107,8 +3122,12 @@ async function addSong(s, opts={}) {
   }
   // 自動分類:有歌手名 → 找(或建立)同名歌單分類掛上
   let targetPlId = null;
+  // 優先順序 1: 從歌手分類進來的「搜尋更多」→ 直接掛該分類
+  if (State._searchPinPl && State.playlists.some(p => p.id === State._searchPinPl)) {
+    targetPlId = State._searchPinPl;
+  }
   const cleanArtist = (s.artist || '').replace(/\s*-\s*Topic$/i,'').replace(/\s*Official.*$/i,'').trim();
-  if (cleanArtist) {
+  if (!targetPlId && cleanArtist) {
     const exist = State.playlists.find(p => String(p.name||'').trim().toLowerCase() === cleanArtist.toLowerCase());
     if (exist) {
       targetPlId = exist.id;
