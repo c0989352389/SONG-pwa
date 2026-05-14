@@ -1154,6 +1154,7 @@ function gasFromCloudSong(s) {
     lang: s['語言'] || '',
     gender: s['性別'] || '',
     album: s['專輯'] || '',
+    label: s['唱片公司'] || '',
     updatedAt: s['更新時間'] || '',
   };
 }
@@ -1308,7 +1309,7 @@ function pushSongToCloud(s, opts={}) {
     '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
     'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0,
     '歌單內排序JSON': JSON.stringify(s.orderInPl||{}),
-    '語言': s.lang || '', '性別': s.gender || '', '專輯': s.album || '',
+    '語言': s.lang || '', '性別': s.gender || '', '專輯': s.album || '', '唱片公司': s.label || '',
     '更新時間': s.updatedAt || new Date().toISOString()
   }).catch(e => console.warn('push', e));
 }
@@ -2651,6 +2652,7 @@ function openSongSheet(id) {
     if (!parsed) { toast('AI 無回應或額度用完'); return; }
     s.title = parsed.title; if (parsed.artist) s.artist = parsed.artist;
     if (parsed.album) s.album = parsed.album;
+    if (parsed.label) s.label = parsed.label;
     delete s.searchTitle; delete s.searchArtist; s.lrc = ''; s._lrcTried = false;
     saveSongsLocal(); pushSongToCloud(s); renderLibrary();
     if (State.currentId === s.id) { setNpTitle(s.title); $('#np-artist').textContent = s.artist || ''; parseLyrics(''); autoFetchLrcSilent(s); }
@@ -3032,23 +3034,24 @@ async function autoClassify(s, force) {
   }
 }
 
-// 用 AI 從 YT 標題+頻道解析出真實歌名/歌手/專輯
+// 用 AI 從 YT 標題+頻道解析出真實歌名/歌手/專輯/唱片公司
 async function _aiParseSong(rawTitle, rawChannel) {
   if (!State.settings.geminiKey || _geminiCooldownLeft() > 0) return null;
-  const prompt = `從這個 YouTube 影片資訊判斷真實的歌曲名、歌手名、所屬專輯。
+  const prompt = `從這個 YouTube 影片資訊判斷真實的歌曲名、歌手名、所屬專輯、唱片公司。
 YouTube 標題: ${rawTitle}
 頻道: ${rawChannel || '(未知)'}
 
 注意:
-- 頻道可能是唱片公司、MV 上傳者(例如「索尼音樂」「Peculiar音樂」「VEVO」),不是真正歌手
+- 頻道可能是唱片公司、MV 上傳者(例如「索尼音樂」「Peculiar音樂」「VEVO」「滾石唱片」),不是真正歌手
+- 若頻道本身就是唱片公司就填進 label;否則依你的知識補上該歌曲的發行唱片公司
 - 標題常含【高音質】、(Official MV)、[HD]、《》、ft.、feat. 等贅字,清掉
-- 歌名要乾淨(不含歌手名/專輯名)
+- 歌名要乾淨(不含歌手名/專輯名/品質標記)
 - 專輯名若標題沒寫,根據你的知識補(查不到就留空)
 
-僅回傳 JSON,格式: {"title":"歌名","artist":"歌手名","album":"專輯名"}
+僅回傳 JSON,格式: {"title":"歌名","artist":"歌手名","album":"專輯名","label":"唱片公司"}
 不確定的欄位留空字串。不要 markdown,只給純 JSON。`;
   try {
-    const text = await gemini(prompt, { temp: 0.2, max: 200 });
+    const text = await gemini(prompt, { temp: 0.2, max: 250 });
     const m = String(text).match(/\{[\s\S]*?\}/);
     if (!m) return null;
     const j = JSON.parse(m[0].replace(/[""]/g,'"'));
@@ -3056,18 +3059,19 @@ YouTube 標題: ${rawTitle}
     return {
       title: String(j.title).trim(),
       artist: String(j.artist || '').trim(),
-      album: String(j.album || '').trim()
+      album: String(j.album || '').trim(),
+      label: String(j.label || '').trim()
     };
   } catch(e){ console.warn('aiParseSong', e); return null; }
 }
 
 async function addSong(s, opts={}) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
-  // AI 解析真實歌名/歌手/專輯(若有 Gemini key 且不在冷卻)
+  // AI 解析真實歌名/歌手/專輯/唱片公司(若有 Gemini key 且不在冷卻)
   if (!opts.skipAiParse) {
     const parsed = await _aiParseSong(s.title, s.artist);
     if (parsed) {
-      s = { ...s, title: parsed.title, artist: parsed.artist || s.artist, album: parsed.album || '' };
+      s = { ...s, title: parsed.title, artist: parsed.artist || s.artist, album: parsed.album || '', label: parsed.label || '' };
     }
   }
   // 同歌手+同歌名才提示(可跳過)
@@ -3105,7 +3109,7 @@ async function addSong(s, opts={}) {
     dur:'', addedAt: new Date().toISOString(), tag: (s.artist || '').trim(), playCount:0, lastPlay:'',
     lrc:'', note:'', translations:{}, explanations:{}, sections:[],
     playlistIds: targetPlId ? [targetPlId] : [], bpm: 0,
-    album: s.album || ''
+    album: s.album || '', label: s.label || ''
   };
   State.songs.unshift(local); saveSongsLocal(); renderLibrary();
   toast('已加入「' + (State.playlists.find(p=>p.id===targetPlId)?.name || '') + '」');
@@ -4013,6 +4017,7 @@ async function batchAiCleanup() {
       if (parsed.title && parsed.title !== s.title) { s.title = parsed.title; changed = true; }
       if (parsed.artist && parsed.artist !== s.artist) { s.artist = parsed.artist; changed = true; }
       if (parsed.album && parsed.album !== s.album) { s.album = parsed.album; changed = true; }
+      if (parsed.label && parsed.label !== s.label) { s.label = parsed.label; changed = true; }
       parsedOk++;
     } else { failed++; await new Promise(r => setTimeout(r, 1200)); continue; }
 
