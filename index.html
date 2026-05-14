@@ -768,7 +768,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
       </div>
       <div id="tab-recommend" style="display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div style="font-size:12px;color:var(--text2);line-height:1.6">熱門歌手 Top 20,點擊直接搜尋</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">熱門歌手 Top 8,點擊直接搜尋</div>
           <button class="btn dim sm" id="btn-refresh-artists" title="重新整理">⟳</button>
         </div>
         <div id="hot-artists" class="artist-grid">
@@ -3012,11 +3012,22 @@ async function addSong(s, opts={}) {
       if (newName.trim()) s = { ...s, title: newName.trim() };
     }
   }
-  // 歌單選擇:語音/網址加歌可跳過 — 永遠不掛分類
-  let targetPlId;
-  if (opts.skipPickPlaylist) {
-    targetPlId = null;
-  } else {
+  // 自動分類:有歌手名 → 找(或建立)同名歌單分類掛上
+  let targetPlId = null;
+  const cleanArtist = (s.artist || '').replace(/\s*-\s*Topic$/i,'').replace(/\s*Official.*$/i,'').trim();
+  if (cleanArtist) {
+    const exist = State.playlists.find(p => String(p.name||'').trim().toLowerCase() === cleanArtist.toLowerCase());
+    if (exist) {
+      targetPlId = exist.id;
+    } else {
+      const p = { id: uid('pl'), name: cleanArtist, sortOrder: State.playlists.length, color: '' };
+      State.playlists.push(p); savePlaylistsLocal(); renderPlaylistTabs();
+      if (State.settings.gasUrl) gas('upsertPlaylist', { 'ID': p.id, '名稱': p.name, '排序': p.sortOrder, '顏色': '' }).catch(()=>{});
+      targetPlId = p.id;
+    }
+  }
+  // 若沒歌手又不是 skip 模式 → 還是讓使用者手選
+  if (!targetPlId && !opts.skipPickPlaylist) {
     targetPlId = await pickPlaylistForNewSong(s);
     if (!targetPlId) { toast('已取消'); return null; }
   }
@@ -3130,11 +3141,10 @@ ${seed ? '\n使用者額外要求風格: ' + seed : ''}
   }
 }
 
-// ===== Hot Artists Top 20 =====
-const HOT_ARTISTS_KEY = 'hot_artists_v1';
+// ===== Hot Artists Top 8 =====
+const HOT_ARTISTS_KEY = 'hot_artists_v2';
 const FALLBACK_ARTISTS = [
-  '周杰倫','蔡依林','五月天','林俊傑','田馥甄','鄧紫棋','告五人','茄子蛋','韋禮安','八三夭',
-  '陳奕迅','蕭敬騰','張惠妹','孫燕姿','周興哲','玖壹壹','米津玄師','宇多田光','IU','NewJeans'
+  '周杰倫','五月天','田馥甄','鄧紫棋','告五人','林俊傑','米津玄師','IU'
 ];
 function _readHotArtists() {
   try {
@@ -3149,17 +3159,18 @@ function _readHotArtists() {
 async function _fetchHotArtistsFromAI() {
   if (!State.settings.geminiKey) return null;
   if (_geminiCooldownLeft() > 0) return null;
-  const prompt = `列出目前(本月)台灣 / 華語 / 日韓 樂壇最熱門/最常被搜尋的 20 位歌手或團體名稱。
+  const prompt = `列出目前(本月)台灣 / 華語 / 日韓 樂壇最熱門/最常被搜尋的 8 位歌手或團體名稱。
 要求:
 - 純歌手/團體名,不要曲名
-- 中港台日韓混合,以華語為主(約 12-14 位),日韓 6-8 位
+- 中港台日韓混合,以華語為主(約 5-6 位),日韓 2-3 位
 - 涵蓋資深天王天后與當紅新生代
+- 每次推薦盡量輪換不同人,不要每次都同一批
 - 一行一個,不要編號、不要說明、不要任何符號
-僅輸出 20 行歌手名,不要其他內容。`;
+僅輸出 8 行歌手名,不要其他內容。`;
   try {
-    const text = await gemini(prompt, { temp: 0.6, max: 600, googleSearch: true });
+    const text = await gemini(prompt, { temp: 0.85, max: 300, googleSearch: true });
     const list = String(text).split(/\r?\n/).map(s => s.replace(/^[\d.\s\-•*]+/, '').trim()).filter(s => s && s.length < 30);
-    if (list.length >= 12) return list.slice(0, 20);
+    if (list.length >= 5) return list.slice(0, 8);
   } catch(e) { console.warn('hot artists ai', e); }
   return null;
 }
