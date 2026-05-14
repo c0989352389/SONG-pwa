@@ -875,6 +875,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
         <button class="btn dim" id="btn-test-gas">🔌 測試 GAS</button>
         <button class="btn dim" id="btn-resync">⟳ 手動同步</button>
         <button class="btn dim" id="btn-ai-cleanup">🤖 AI 整理所有歌曲</button>
+        <button class="btn danger" id="btn-cloud-overwrite">⚠ 雲端覆蓋本機</button>
         <button class="btn dim" data-close>取消</button>
         <button class="btn pri" id="btn-save-settings">儲存</button>
       </div>
@@ -3923,6 +3924,7 @@ function bind() {
   $('#btn-resync').addEventListener('click', syncFromGAS);
   $('#btn-test-gas').addEventListener('click', testGasConnection);
   $('#btn-ai-cleanup').addEventListener('click', batchAiCleanup);
+  $('#btn-cloud-overwrite').addEventListener('click', cloudOverwriteLocal);
   $('#btn-cloud-sync').addEventListener('click', () => {
     if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
     syncFromGAS();
@@ -3973,6 +3975,22 @@ function bind() {
   $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('show')));
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheet));
+}
+
+//============== 雲端覆蓋本機(強制重抓) ==============
+async function cloudOverwriteLocal() {
+  if (!State.settings.gasUrl) { toast('請先設定 GAS URL'); return; }
+  if (!confirm('將清空本機歌曲/歌單,完全從雲端重新拉一份。\n本機未上傳的修改會遺失。確定?')) return;
+  try {
+    const [r, p] = await Promise.all([gas('getSongs'), gas('getPlaylists')]);
+    if (!r || !r.ok || !Array.isArray(r.songs)) { toast('拉取雲端歌曲失敗'); return; }
+    if (!p || !p.ok || !Array.isArray(p.playlists)) { toast('拉取雲端歌單失敗'); return; }
+    State.songs = r.songs.map(gasFromCloudSong);
+    State.playlists = p.playlists.map(x => ({ id: x['ID'], name: x['名稱'], sortOrder: Number(x['排序'])||0, color: x['顏色'] || '' }));
+    saveSongsLocal(); savePlaylistsLocal();
+    renderPlaylistTabs(); renderLibrary();
+    toast('✓ 已用雲端資料覆蓋本機(' + State.songs.length + ' 首 / ' + State.playlists.length + ' 個分類)', 5000);
+  } catch(e) { toast('覆蓋失敗: ' + e.message, 5000); }
 }
 
 //============== 批次 AI 整理所有歌曲 + 查核歌詞 ==============
