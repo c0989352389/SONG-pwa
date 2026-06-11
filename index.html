@@ -12,6 +12,11 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://www.youtube.com">
+<link rel="preconnect" href="https://i.ytimg.com">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="dns-prefetch" href="https://googleapis.com">
+<script async src="https://www.youtube.com/iframe_api"></script>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -999,7 +1004,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
   </div>
 </div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
+<!-- YT API 已在 head async 載入 -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 'use strict';
@@ -1629,7 +1634,16 @@ function onYouTubeIframeAPIReady() {
     height:'100%', width:'100%',
     playerVars: { playsinline:1, controls:0, rel:0, modestbranding:1, iv_load_policy:3 },
     events: {
-      onReady: () => { State.ready = true; restoreLastSong(); },
+      onReady: () => {
+        State.ready = true;
+        restoreLastSong();
+        // 處理 player 未就緒時的 pending 播放
+        if (State._pendingPlay && Date.now() - State._pendingPlay.ts < 30000) {
+          const pid = State._pendingPlay.id;
+          State._pendingPlay = null;
+          setTimeout(() => playSong(pid), 100);
+        }
+      },
       onStateChange: onPlayerState,
       onPlaybackRateChange: e => { State.speed = e.data; updateSpeedLabel(); },
       onError: e => handleYtError(e.data)
@@ -1764,7 +1778,9 @@ function playSong(id) {
   drawAbButtons(); drawAbMarkers();
   // 隨機主題:換歌時換新色
   if (!State.player || !State.player.loadVideoById) {
-    toast('播放器未就緒,請稍候再試');
+    // 排隊:onReady 觸發時自動播
+    State._pendingPlay = { id, ts: Date.now() };
+    toast('正在載入播放器…', 1500);
     return;
   }
   try {
@@ -1794,9 +1810,14 @@ function openVolModal() {
 function togglePlay() {
   if (!State.songs.length) { toast('歌單是空的'); return; }
   if (!State.currentId) { State.userPaused = false; playSong(State.songs[0].id); return; }
-  if (!State.player || !State.player.playVideo) { toast('播放器未就緒'); return; }
+  // player 還沒就緒 → 排隊
+  if (!State.player || !State.player.playVideo) {
+    State._pendingPlay = { id: State.currentId, ts: Date.now() };
+    toast('正在載入播放器…', 1500);
+    return;
+  }
   if (State.isPlaying) {
-    State.userPaused = true; // 標記為使用者主動暫停
+    State.userPaused = true;
     try { State.player.pauseVideo(); } catch(_){}
     return;
   }
