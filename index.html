@@ -854,6 +854,11 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
         <input type="text" id="set-yt-key" placeholder="AIzaSy...">
       </div>
       <div class="modal-row">
+        <label>YouTube 匯入清單網址（公開/非公開）</label>
+        <input type="text" id="set-yt-playlist" placeholder="https://www.youtube.com/playlist?list=PL...">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">設定後可用下方「📥 匯入清單新歌」一鍵把清單裡的新歌加進來</div>
+      </div>
+      <div class="modal-row">
         <label>Gemini API Key（AI 歌詞 / 翻譯 / 解釋）</label>
         <input type="text" id="set-gemini-key" placeholder="AIzaSy...">
         <div style="font-size:11px;color:var(--text3);margin-top:4px">免費於 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent2)">Google AI Studio</a> 申請</div>
@@ -879,6 +884,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
       <div class="modal-foot">
         <button class="btn dim" id="btn-test-gas">🔌 測試 GAS</button>
         <button class="btn dim" id="btn-resync">⟳ 手動同步</button>
+        <button class="btn dim" id="btn-import-yt">📥 匯入清單新歌</button>
         <button class="btn dim" id="btn-ai-cleanup">🤖 AI 整理所有歌曲</button>
         <button class="btn danger" id="btn-cloud-overwrite">⚠ 雲端覆蓋本機</button>
         <button class="btn dim" data-close>取消</button>
@@ -1012,7 +1018,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
 const LS = {
   songs:'song.songs', settings:'song.settings', current:'song.current', playlists:'song.playlists', currentPl:'song.curPl', viewMode:'song.viewMode', shuffle:'song.shuffle', repeat:'song.repeat', langF:'song.langF', genderF:'song.genderF', baseVol:'song.baseVol', libView:'song.libView'
 };
-const DEFAULT_SETTINGS = { ytKey:'', geminiKey:'', gasUrl:'', lang:'zh-TW', palette:'default' };
+const DEFAULT_SETTINGS = { ytKey:'', geminiKey:'', gasUrl:'', lang:'zh-TW', palette:'default', ytPlaylist:'' };
 const PALETTES = ['cream','blush','blue','ink','midnight','mocha'];
 const DARK_PALETTES = ['ink','midnight','mocha'];
 function isDarkPalette(name){ return DARK_PALETTES.includes(name || 'default'); }
@@ -4064,6 +4070,7 @@ function bind() {
   }));
   $('#btn-settings').addEventListener('click', () => {
     $('#set-yt-key').value = State.settings.ytKey || '';
+    $('#set-yt-playlist').value = State.settings.ytPlaylist || '';
     $('#set-gemini-key').value = State.settings.geminiKey || '';
     $('#set-gas-url').value = State.settings.gasUrl || '';
     $('#set-lang').value = State.settings.lang || 'zh-TW';
@@ -4085,6 +4092,7 @@ function bind() {
   });
   $('#btn-save-settings').addEventListener('click', () => {
     State.settings.ytKey = $('#set-yt-key').value.trim();
+    State.settings.ytPlaylist = $('#set-yt-playlist').value.trim();
     State.settings.geminiKey = $('#set-gemini-key').value.trim();
     State.settings.gasUrl = $('#set-gas-url').value.trim();
     State.settings.lang = $('#set-lang').value;
@@ -4096,6 +4104,7 @@ function bind() {
   $('#btn-resync').addEventListener('click', syncFromGAS);
   $('#btn-test-gas').addEventListener('click', testGasConnection);
   $('#btn-ai-cleanup').addEventListener('click', batchAiCleanup);
+  $('#btn-import-yt').addEventListener('click', importFromYtPlaylist);
   $('#btn-cloud-overwrite').addEventListener('click', cloudOverwriteLocal);
   $('#btn-cloud-sync').addEventListener('click', () => {
     if (!State.settings.gasUrl) { toast('請先到 ⚙ 設定 GAS URL'); return; }
@@ -4163,6 +4172,78 @@ async function cloudOverwriteLocal() {
     renderPlaylistTabs(); renderLibrary();
     toast('✓ 已用雲端資料覆蓋本機(' + State.songs.length + ' 首 / ' + State.playlists.length + ' 個分類)', 5000);
   } catch(e) { toast('覆蓋失敗: ' + e.message, 5000); }
+}
+
+//============== 從 YouTube 播放清單匯入新歌 ==============
+function _extractPlaylistId(s) {
+  s = (s || '').trim();
+  const m = s.match(/[?&]list=([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  if (/^[A-Za-z0-9_-]{10,}$/.test(s)) return s; // 直接貼 ID
+  return '';
+}
+// 抓取整個清單的影片(自動分頁)
+async function _fetchPlaylistItems(playlistId, key) {
+  const items = [];
+  let pageToken = '';
+  do {
+    let url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}&key=${key}`;
+    if (pageToken) url += `&pageToken=${pageToken}`;
+    const r = await fetch(url);
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message || '清單讀取失敗');
+    (j.items || []).forEach(it => {
+      const vid = it.contentDetails && it.contentDetails.videoId;
+      const sn = it.snippet || {};
+      const title = sn.title || '';
+      // 略過已被刪除/私人影片
+      if (!vid || title === 'Deleted video' || title === 'Private video') return;
+      const thumb = (sn.thumbnails && (sn.thumbnails.medium || sn.thumbnails.default) || {}).url || '';
+      items.push({ videoId: vid, title, artist: sn.videoOwnerChannelTitle || '', thumb });
+    });
+    pageToken = j.nextPageToken || '';
+  } while (pageToken);
+  return items;
+}
+async function importFromYtPlaylist() {
+  if (!State.settings.ytKey) { toast('請先到 ⚙ 設定 YouTube API Key'); return; }
+  let pid = _extractPlaylistId(State.settings.ytPlaylist);
+  if (!pid) {
+    const url = prompt('貼上 YouTube 清單網址（公開/非公開）:', '');
+    if (url === null) return;
+    pid = _extractPlaylistId(url);
+    if (!pid) { toast('看不出清單 ID,請確認網址含 list=...'); return; }
+    State.settings.ytPlaylist = url.trim(); saveSettings();
+  }
+  toast('📥 讀取 YouTube 清單中…', 3000);
+  let items;
+  try {
+    items = await _fetchPlaylistItems(pid, State.settings.ytKey);
+  } catch(e) { toast('清單讀取失敗: ' + e.message, 6000); return; }
+  if (!items.length) { toast('清單是空的或無法讀取(私人清單需改公開/非公開)', 6000); return; }
+  // 過濾已存在(同 videoId)
+  const have = new Set(State.songs.map(x => x.videoId));
+  const fresh = items.filter(it => !have.has(it.videoId));
+  if (!fresh.length) { toast(`清單 ${items.length} 首,沒有新歌`, 5000); return; }
+  if (!confirm(`清單共 ${items.length} 首,有 ${fresh.length} 首新歌。\n將逐一 AI 解析歌名/歌手、自動分類、抓歌詞。\n預估約 ${Math.ceil(fresh.length * 4 / 60)} 分鐘,確定匯入?`)) return;
+
+  let ok = 0, skip = 0, fail = 0;
+  for (let i = 0; i < fresh.length; i++) {
+    const it = fresh[i];
+    const tag = `${i+1}/${fresh.length}`;
+    if (_geminiCooldownLeft() > 0) { toast('AI 額度用完,中斷匯入(處理到 ' + tag + ')', 6000); break; }
+    toast(`📥 匯入 ${tag}: ${(it.title||'').slice(0,18)}`, 2500);
+    try {
+      const r = await addSong(
+        { videoId: it.videoId, title: it.title, artist: it.artist, thumb: it.thumb },
+        { skipDupCheck: true, skipPickPlaylist: true }
+      );
+      if (r) ok++; else skip++;
+    } catch(e) { fail++; }
+    await new Promise(res => setTimeout(res, 600));
+  }
+  renderLibrary();
+  toast(`✓ 匯入完成 / 新增:${ok} / 略過:${skip} / 失敗:${fail}`, 8000);
 }
 
 //============== 批次 AI 整理所有歌曲 + 查核歌詞 ==============
