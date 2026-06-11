@@ -1161,6 +1161,7 @@ function gasFromCloudSong(s) {
     playlistIds: tryParse(s['歌單IDs']) || (s['歌單IDs'] ? String(s['歌單IDs']).split(',').filter(Boolean) : []),
     bpm: Number(s['BPM'])||0,
     lrcOffset: Number(s['歌詞偏移'])||0,
+    volOffset: Number(s['音量補償'])||0,
     orderInPl: tryParse(s['歌單內排序JSON']) || {},
     lang: s['語言'] || '',
     gender: s['性別'] || '',
@@ -1318,7 +1319,7 @@ function pushSongToCloud(s, opts={}) {
     '標籤': s.tag, '備註': s.note, '歌詞LRC': s.lrc,
     '翻譯JSON': JSON.stringify(s.translations||{}), '解釋JSON': JSON.stringify(s.explanations||{}),
     '段落JSON': JSON.stringify(s.sections||[]), '歌單IDs': JSON.stringify(s.playlistIds||[]),
-    'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0,
+    'BPM': s.bpm || 0, '歌詞偏移': s.lrcOffset || 0, '音量補償': s.volOffset || 0,
     '歌單內排序JSON': JSON.stringify(s.orderInPl||{}),
     '語言': s.lang || '', '性別': s.gender || '', '專輯': s.album || '', '唱片公司': s.label || '',
     '更新時間': s.updatedAt || new Date().toISOString()
@@ -1710,6 +1711,7 @@ function onPlayerState(e) {
     State.duration = State.player.getDuration() || 0;
     $('#np-dur').textContent = fmt(State.duration);
     drawAbMarkers();
+    applySongVolume(getCur());
     startProgress();
     if (State.currentId) {
       bumpPlayCount(State.currentId);
@@ -1805,6 +1807,7 @@ function setNpTitle(text) {
 function playSong(id) {
   const s = State.songs.find(x => x.id === id);
   if (!s) return;
+  State.userPaused = false; // 主動切歌一律播放,不受先前暫停狀態影響
   State.currentId = id;
   localStorage.setItem(LS.current, id);
   setNpTitle(s.title || '(未命名)');
@@ -1828,13 +1831,20 @@ function playSong(id) {
   }
   try {
     State.player.loadVideoById({ videoId: s.videoId, startSeconds: 0 });
+    applySongVolume(s);
     State.player.playVideo();
   } catch(e) { console.warn('playSong load fail', e); toast('播放失敗: ' + e.message); }
   renderLibrary();
 }
 // ===== 音量平衡 =====
 const DEFAULT_BASE_VOL = 70;
-function applySongVolume(s) { /* 音量平衡已取消,沿用 YT 預設 */ }
+function applySongVolume(s) {
+  if (!State.player || !State.player.setVolume) return;
+  const base = (typeof State.baseVolume === 'number') ? State.baseVolume : DEFAULT_BASE_VOL;
+  const off = (s && typeof s.volOffset === 'number') ? s.volOffset : 0;
+  const vol = Math.min(100, Math.max(0, base + off));
+  try { State.player.setVolume(vol); State.player.unMute && State.player.unMute(); } catch(_){}
+}
 function enterFakeFs() {
   document.body.classList.add('fake-fs');
 }
