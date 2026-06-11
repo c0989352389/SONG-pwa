@@ -2256,9 +2256,35 @@ function shiftLrc(delta) {
   s.lrcOffset = Math.round(((s.lrcOffset || 0) + delta) * 10) / 10;
   saveSongsLocal(); pushSongToCloud(s);
   updateLrcOffsetLabel();
-  State.activeLyricIdx = -2;
-  if (State.player && State.player.getCurrentTime) syncLyric(State.player.getCurrentTime() || 0);
+  _forceLyricResync();
   _flashOffset(s.lrcOffset, delta);
+}
+// 強制重算當前對應歌詞 + 觸發 DOM 更新(不論播放器狀態/idx 是否相同)
+function _forceLyricResync() {
+  const s = getCur(); if (!s) return;
+  let t = 0;
+  try { if (State.player && State.player.getCurrentTime) t = State.player.getCurrentTime() || 0; } catch(_){}
+  State.activeLyricIdx = -2; // 確保 syncLyric 不會短路 return
+  syncLyric(t);
+  // 強制呼叫一次更新(以防 idx 沒變但畫面要刷新顯示新偏移後的對應行)
+  const offset = s.lrcOffset || 0;
+  const adjT = t - offset;
+  let idx = -1;
+  for (let i = 0; i < State.lyrics.length; i++) {
+    if (State.lyrics[i].t < 0) continue;
+    if (State.lyrics[i].t <= adjT) idx = i; else break;
+  }
+  _updateBigLyrics(idx);
+  // 顯示對應現在這一刻的歌詞短暫高亮
+  const nowEl = document.querySelector('.big-lyrics .bl-now');
+  if (nowEl) {
+    nowEl.style.transition = 'none';
+    nowEl.style.filter = 'brightness(1.6)';
+    requestAnimationFrame(() => {
+      nowEl.style.transition = 'filter .35s';
+      nowEl.style.filter = '';
+    });
+  }
 }
 function anchorFirstLyric() {
   const s = getCur(); if (!s) { toast('先選一首歌'); return; }
@@ -2271,8 +2297,7 @@ function anchorFirstLyric() {
   s.lrcOffset = Math.round((now - first.t) * 10) / 10;
   saveSongsLocal(); pushSongToCloud(s);
   updateLrcOffsetLabel();
-  State.activeLyricIdx = -2;
-  syncLyric(now);
+  _forceLyricResync();
   _flashOffset(s.lrcOffset, s.lrcOffset - oldOff);
   toast('📍 已將第一句定位在 ' + fmt(now));
 }
@@ -2294,8 +2319,7 @@ function resetLrcOffset() {
   const s = getCur(); if (!s) return;
   s.lrcOffset = 0; saveSongsLocal(); pushSongToCloud(s);
   updateLrcOffsetLabel();
-  State.activeLyricIdx = -2;
-  if (State.player && State.player.getCurrentTime) syncLyric(State.player.getCurrentTime() || 0);
+  _forceLyricResync();
   toast('偏移已重設');
 }
 function toggleCalib() {
