@@ -1550,6 +1550,35 @@ function _isRejected(s, lrc) {
   return list.some(rh => rh && (rh === h || rh.slice(0,120) === h.slice(0,120)));
 }
 
+// NetEase Music 歌詞抓取
+async function neteaseFetchLyric(title, artist) {
+  const songName = _smartSongName(title, artist) || title;
+  const cleanArtist = (artist || '').replace(/\s*-\s*Topic.*$/i,'').trim();
+  const queries = [
+    `${songName} ${cleanArtist}`,
+    songName,
+    `${cleanArtist} ${songName}`,
+  ].filter(q => q && q.trim());
+  for (const q of queries) {
+    try {
+      const sr = await fetch('https://music.163.com/api/search/get?type=1&limit=5&s=' + encodeURIComponent(q));
+      if (!sr.ok) continue;
+      const sj = await sr.json();
+      const songs = ((sj && sj.result) || {}).songs || [];
+      for (const it of songs.slice(0, 3)) {
+        const lr = await fetch(`https://music.163.com/api/song/lyric?id=${it.id}&lv=1&kv=1&tv=-1`);
+        if (!lr.ok) continue;
+        const lj = await lr.json();
+        const lrc = (lj && lj.lrc && lj.lrc.lyric) || '';
+        if (lrc && /\[\d{1,2}:\d{2}/.test(lrc) && lrc.split('\n').length > 6) {
+          return lrc;
+        }
+      }
+    } catch(_){}
+  }
+  return null;
+}
+
 async function fetchLyricsAuto(s, opts={}) {
   const dur = State.duration || 0;
   const minLines = dur > 60 ? Math.max(10, Math.floor(dur/10)) : 6;
@@ -1569,6 +1598,14 @@ async function fetchLyricsAuto(s, opts={}) {
   r = await lrclibSearchFuzzy(useTitle, useArtist, dur);
   if (r?.syncedLyrics && accept(r.syncedLyrics)) return { source:'lrclib-search', lrc: r.syncedLyrics };
   if (r?.plainLyrics && !_isRejected(s, r.plainLyrics)) plain = plain || r.plainLyrics;
+
+  // 2.5) NetEase 網易雲音樂(覆蓋華語很全)
+  try {
+    const ne = await neteaseFetchLyric(useTitle, useArtist);
+    if (ne && /\[\d{1,2}:\d{2}/.test(ne) && _countLrcLines(ne) >= minLines && accept(ne)) {
+      return { source:'netease', lrc: ne };
+    }
+  } catch(e){ console.warn('netease', e); }
 
   // 3) AI 補時間戳
   if (plain && State.settings.geminiKey) {
@@ -3122,13 +3159,49 @@ YouTube 標題: ${rawTitle}
   } catch(e){ console.warn('aiParseSong', e); return null; }
 }
 
+// 啟發式解析(AI 失敗 / 無 key 時 fallback)
+function _heuristicParseSong(rawTitle, rawChannel) {
+  const LABEL_RE = /(唱片|VEVO$|Topic$|Records?$|Entertainment|Timeless|Peculiar|SMD|Studio|Media|福茂|索尼|滾石|華納|環球|相信|海蝶|Warner|Sony|Universal|EMI|JVR|Avex|HIM|Asia|豐華|聲動|金曲|Music$|lyrics|Channel|Official)/i;
+  const clean = (t) => t
+    .replace(/\([^)]*Official[^)]*\)/gi,'')
+    .replace(/\([^)]*官方[^)]*\)/g,'')
+    .replace(/\([^)]*MV[^)]*\)/gi,'')
+    .replace(/\[[^\]]*HD[^\]]*\]/gi,'')
+    .replace(/【[^】]*高音質[^】]*】/g,'')
+    .replace(/Official\s*Music\s*Video.*$/gi,'')
+    .replace(/Official\s*Video.*$/gi,'')
+    .replace(/官方\s*MV.*$/g,'')
+    .replace(/\s+/g,' ').trim();
+  const title = rawTitle.trim();
+  // 「歌手 - 歌名」
+  const dash = title.split(/\s*[-–—]\s*/);
+  if (dash.length >= 2) {
+    let left = dash[0].trim();
+    let right = dash.slice(1).join(' - ').trim();
+    // 取裡面【】
+    const m = right.match(/[【《「\[](.+?)[】》」\]]/);
+    if (m) right = m[1].trim(); else right = clean(right);
+    left = left.split(/\s+/)[0]; // 取第一段(通常中文)
+    return { title: right, artist: left };
+  }
+  // 「歌手【歌名】」
+  const m = title.match(/^(.+?)[【《「](.+?)[】》」]/);
+  if (m) return { title: m[2].trim(), artist: m[1].trim() };
+  // 啥都沒比中,如果頻道不是 label 就用 channel
+  if (rawChannel && !LABEL_RE.test(rawChannel)) {
+    return { title: clean(title), artist: rawChannel.trim() };
+  }
+  return null;
+}
+
 async function addSong(s, opts={}) {
   if (State.songs.some(x => x.videoId === s.videoId)) { toast('歌單已有這首'); return null; }
-  // AI 解析真實歌名/歌手/專輯/唱片公司(若有 Gemini key 且不在冷卻)
+  // 先 AI 解析,失敗 fallback 啟發式
   if (!opts.skipAiParse) {
-    const parsed = await _aiParseSong(s.title, s.artist);
+    let parsed = await _aiParseSong(s.title, s.artist);
+    if (!parsed) parsed = _heuristicParseSong(s.title, s.artist);
     if (parsed) {
-      s = { ...s, title: parsed.title, artist: parsed.artist || s.artist, album: parsed.album || '', label: parsed.label || '' };
+      s = { ...s, title: parsed.title, artist: parsed.artist || s.artist, album: parsed.album || s.album || '', label: parsed.label || s.label || '' };
     }
   }
   // 同歌手+同歌名才提示(可跳過)
@@ -3174,15 +3247,25 @@ async function addSong(s, opts={}) {
   };
   State.songs.unshift(local); saveSongsLocal(); renderLibrary();
   toast('已加入「' + (State.playlists.find(p=>p.id===targetPlId)?.name || '') + '」');
-  if (State.settings.gasUrl) {
-    try {
-      await gas('upsertSong', {
-        'ID': local.id, '歌名': local.title, '歌手': local.artist, 'YouTubeID': local.videoId,
-        '縮圖': local.thumb, '時長': local.dur, '歌單IDs': JSON.stringify(local.playlistIds)
-      });
-    } catch(e){ console.warn('cloud add', e); }
-  }
+  pushSongToCloud(local).catch(()=>{});
+  // 背景驗證:自動抓歌詞,完成後 push 雲端
+  setTimeout(() => verifyNewSong(local), 800);
   return local;
+}
+// 新加歌曲背景驗證:抓歌詞 + 推雲端
+async function verifyNewSong(s) {
+  try {
+    if (!s.lrc) {
+      const r = await fetchLyricsAuto(s);
+      if (r && r.lrc) {
+        s.lrc = r.lrc;
+        saveSongsLocal();
+        pushSongToCloud(s);
+        if (State.currentId === s.id) parseLyrics(r.lrc);
+        console.log('[verify] lyrics ok:', s.title);
+      }
+    }
+  } catch(e) { console.warn('verifyNewSong', e); }
 }
 // 加歌時跳出選歌單對話框,使用者可選現有或新建
 function pickPlaylistForNewSong(s) {
