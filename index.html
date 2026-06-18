@@ -472,34 +472,44 @@ body.mode-video .np-simple .big-lyrics{display:none!important}
 body.mode-lyrics .np-simple #np-vis{display:none}
 body.mode-lyrics .np-simple #np-art{display:none}
 body.mode-lyrics .np-simple .big-lyrics{justify-content:center}
-body.mode-lyrics .np-simple .big-lyrics .bl-prev{font-size:clamp(20px,5vw,30px)}
-body.mode-lyrics .np-simple .big-lyrics .bl-now{font-size:clamp(34px,8.5vw,52px)}
-body.mode-lyrics .np-simple .big-lyrics .bl-next{font-size:clamp(20px,5vw,30px)}
+body.mode-lyrics .np-simple .big-lyrics .bl-prev{font-size:clamp(17px,4.2vw,25px)}
+body.mode-lyrics .np-simple .big-lyrics .bl-now{font-size:clamp(32px,8vw,50px)}
+body.mode-lyrics .np-simple .big-lyrics .bl-next{font-size:clamp(26px,6.4vw,40px)}
+body.mode-lyrics .np-simple .big-lyrics .bl-next2{font-size:clamp(17px,4.2vw,25px)}
 .np-simple #np-vis > div{position:absolute;inset:0}
 .np-simple #np-vis iframe{width:100%;height:100%;border:0}
 #vis-overlay{position:absolute;inset:0;z-index:5;background:transparent;cursor:grab}
 .big-lyrics{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:14px 18px;overflow:hidden;min-height:0;font-family:'LXGW WenKai TC','Fraunces','Noto Sans TC',serif}
-.big-lyrics .bl-prev{font-size:clamp(17px,4.2vw,24px);color:color-mix(in srgb, var(--ink) 48%, transparent);line-height:1.45;margin-bottom:10px;transition:all .3s;letter-spacing:.4px;font-weight:400}
-.big-lyrics .bl-now{font-size:clamp(30px,8vw,48px);font-weight:400;line-height:1.35;letter-spacing:0;margin-bottom:10px;transition:font-size .3s;color:var(--ink)}
-.big-lyrics .bl-next{font-size:clamp(17px,4.2vw,24px);color:color-mix(in srgb, var(--ink) 48%, transparent);line-height:1.45;transition:all .3s;letter-spacing:.4px;font-weight:400}
+.big-lyrics .bl-prev{font-size:clamp(15px,3.6vw,21px);color:color-mix(in srgb, var(--ink) 42%, transparent);line-height:1.4;margin-bottom:8px;transition:all .3s;letter-spacing:.4px;font-weight:400}
+.big-lyrics .bl-now{font-size:clamp(28px,7.4vw,46px);font-weight:500;line-height:1.32;letter-spacing:0;margin-bottom:8px;transition:font-size .3s;color:var(--ink)}
+.big-lyrics .bl-next{font-size:clamp(24px,6vw,38px);color:color-mix(in srgb, var(--ink) 80%, transparent);line-height:1.34;margin-bottom:8px;transition:all .3s;letter-spacing:0;font-weight:400}
+.big-lyrics .bl-next2{font-size:clamp(15px,3.6vw,21px);color:color-mix(in srgb, var(--ink) 42%, transparent);line-height:1.4;transition:all .3s;letter-spacing:.4px;font-weight:400}
 .np-bottom-row{display:flex;align-items:center;gap:10px;padding:0 6px 6px;flex-shrink:0}
 .voice-fab{width:42px;height:42px;border-radius:50%;background:var(--card);border:1px solid var(--glass-br);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit;transition:all .15s}
 .voice-fab:hover{background:var(--paper2)}
 .voice-fab.rec{background:var(--brick);border-color:var(--brick);color:var(--paper);animation:pulse 1.4s infinite}
-.lrc-mini{flex:1;display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
-.lrc-mini .btn{padding:6px 9px;font-size:13px;min-height:auto;border-radius:8px}
-.lrc-mini .offset-lbl.sm{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink2);padding:4px 8px;background:var(--card);border:1px solid var(--glass-br);border-radius:8px;min-width:50px;text-align:center;letter-spacing:.5px}
+.lrc-mini{flex:1;display:flex;gap:7px;align-items:center;justify-content:center;flex-wrap:wrap}
+.lrc-mini .btn{padding:10px 14px;font-size:17px;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:11px}
+.lrc-mini .offset-lbl.sm{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink2);padding:8px 10px;background:var(--card);border:1px solid var(--glass-br);border-radius:10px;min-width:58px;text-align:center;letter-spacing:.5px}
+.lrc-mini .btn.on{background:var(--brick);border-color:var(--brick);color:var(--paper);box-shadow:0 3px 12px color-mix(in srgb,var(--brick) 35%,transparent);font-weight:600}
 /* 移除舊面板的 padding-bottom 對齊(因為 nav 拿掉了) */
 .page{padding-bottom:14px!important}
 /* 橫向佈局:只剩歌詞置中放大,影片隱藏 */
-body.orient-land .np-simple{flex-direction:column;height:100dvh;gap:14px;justify-content:center}
+body.orient-land .np-simple{flex-direction:column;height:100dvh;gap:6px;justify-content:center;padding:6px 14px}
 body.orient-land .np-simple #np-vis{display:none!important}
-body.orient-land .big-lyrics{flex:1 1 auto;justify-content:center}
-body.orient-land .big-lyrics .bl-prev{font-size:clamp(20px,3vw,32px)}
-body.orient-land .big-lyrics .bl-now{font-size:clamp(36px,5.2vw,64px)}
-body.orient-land .big-lyrics .bl-next{font-size:clamp(20px,3vw,32px)}
-body.orient-land .np-bottom-row{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:color-mix(in srgb, var(--card) 92%, transparent);backdrop-filter:blur(14px);border:1px solid var(--glass-br);border-radius:99px;padding:6px 12px;z-index:50;box-shadow:0 8px 24px rgba(58,46,38,.15)}
+body.orient-land .np-simple #np-art{display:none!important}
+body.orient-land .np-title-wrap{flex:0 0 auto;margin:0}
+body.orient-land .big-lyrics{flex:1 1 auto;justify-content:center;padding:2px 12px;min-height:0}
+body.orient-land .big-lyrics .bl-prev{font-size:clamp(15px,2vw,22px);margin-bottom:4px}
+body.orient-land .big-lyrics .bl-now{font-size:clamp(30px,4.4vw,54px);margin-bottom:4px}
+body.orient-land .big-lyrics .bl-next{font-size:clamp(24px,3.4vw,42px);margin-bottom:4px}
+body.orient-land .big-lyrics .bl-next2{font-size:clamp(15px,2vw,22px)}
+body.orient-land .np-prog{flex:0 0 auto;margin-bottom:4px}
+body.orient-land .np-ctrl{flex:0 0 auto;margin-bottom:4px;gap:10px}
+body.orient-land .np-bottom-row{flex:0 0 auto}
 body.orient-land header{display:none}
+body.orient-land #page-player{padding:0!important;height:100dvh;overflow:hidden}
+body.orient-land nav{display:none}
 
 /* 浮動控制條 */
 #float-ctrl{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);z-index:300;background:var(--card);backdrop-filter:blur(18px);border:1px solid var(--glass-br);border-radius:18px;padding:14px 16px;width:min(420px,92vw);box-shadow:0 18px 50px rgba(58,46,38,.22);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
@@ -702,6 +712,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
           <div class="bl-prev">　</div>
           <div class="bl-now">　</div>
           <div class="bl-next">　</div>
+          <div class="bl-next2">　</div>
         </div>
 
         <div class="np-prog">
@@ -720,6 +731,7 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
         </div>
 
         <div class="np-bottom-row">
+          <button class="voice-fab" id="btn-voice" title="語音控制" aria-label="語音控制">🎤</button>
           <div class="lrc-mini">
             <button class="btn dim sm" id="btn-lrc-back" title="歌詞早 0.5 秒">−</button>
             <span class="offset-lbl sm" id="lrc-offset">0.0s</span>
@@ -801,7 +813,6 @@ body.mode-lyrics .np-simple{position:relative;z-index:1}
   </main>
 
   <nav>
-    <button class="nb" id="btn-voice" title="語音控制" aria-label="語音控制"><span class="ni">🎤</span><span>語音</span></button>
     <button class="nb active" data-page="player"><span class="ni">♪</span><span>播放</span></button>
     <button class="nb" data-page="library"><span class="ni">♫</span><span>歌單</span></button>
     <button class="nb" data-page="add"><span class="ni">＋</span><span>加歌</span></button>
@@ -1712,6 +1723,7 @@ function onPlayerState(e) {
     $('#np-dur').textContent = fmt(State.duration);
     drawAbMarkers();
     applySongVolume(getCur());
+    State._resumeTries = 0;
     startProgress();
     if (State.currentId) {
       bumpPlayCount(State.currentId);
@@ -1725,14 +1737,18 @@ function onPlayerState(e) {
     $('#np-art').classList.remove('playing'); document.body.classList.remove('playing'); stopProgress();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     stopThemeCycle();
-    // 非使用者主動暫停(YT 因 buffer/load 自動暫停) → 自動續播
+    // 非使用者主動暫停(YT 因 buffer/load/自動播放政策 而停) → 多次重試續播
     if (!State.userPaused) {
       clearTimeout(State._autoResume);
-      State._autoResume = setTimeout(() => {
-        if (!State.isPlaying && !State.userPaused && State.player && State.player.playVideo) {
-          try { State.player.playVideo(); } catch(_){}
-        }
-      }, 800);
+      const tryResume = () => {
+        if (State.userPaused || State.isPlaying) return;
+        if (!State.player || !State.player.playVideo) return;
+        if ((State._resumeTries || 0) >= 6) return; // 重試上限,避免無限迴圈
+        State._resumeTries = (State._resumeTries || 0) + 1;
+        try { State.player.playVideo(); } catch(_){}
+        State._autoResume = setTimeout(tryResume, 600);
+      };
+      State._autoResume = setTimeout(tryResume, 500);
     }
   } else if (s === YT.PlayerState.BUFFERING) {
     // 緩衝中也記住非使用者暫停
@@ -2252,13 +2268,16 @@ function _updateBigLyrics(idx) {
   const prevEl = document.querySelector('.big-lyrics .bl-prev');
   const now = document.querySelector('.big-lyrics .bl-now');
   const next = document.querySelector('.big-lyrics .bl-next');
+  const next2El = document.querySelector('.big-lyrics .bl-next2');
   if (!now || !next) return;
   const prv = idx > 0 ? State.lyrics[idx - 1] : null;
   const cur = idx >= 0 ? State.lyrics[idx] : null;
   const nxt = idx + 1 < State.lyrics.length ? State.lyrics[idx + 1] : null;
+  const nxt2 = idx + 2 < State.lyrics.length ? State.lyrics[idx + 2] : null;
   if (prevEl) prevEl.textContent = prv ? prv.text : '　';
   now.textContent = cur ? cur.text : (State.lyrics.length ? '　' : '');
   next.textContent = nxt ? nxt.text : '　';
+  if (next2El) next2El.textContent = nxt2 ? nxt2.text : '　';
 }
 
 function updateLrcOffsetLabel() {
